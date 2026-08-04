@@ -1,0 +1,124 @@
+---
+title: Admin Log
+description: Internal record of ScreenThis documentation changes, scope, sources, and maintenance decisions.
+---
+
+# Admin Log
+
+<Callout kind="warning">
+This page is an internal operational record. It summarizes system documentation without including passwords, tokens, private keys, or secret values.
+</Callout>
+
+## 2026-08-03 — Documentation baseline and help-center release
+
+### Summary
+
+Created a complete documentation baseline for the current ScreenThis application. The work covers internal architecture and operations as well as non-technical customer guidance. This was a documentation-only change: no application behavior, database schema, permissions, or production configuration was modified as part of this documentation update.
+
+### Source-of-truth policy established
+
+The internal documentation now uses the following precedence when written guidance and implementation differ:
+
+1. Live database schema, grants, policies, triggers, and functions for deployed data behavior.
+2. Edge Function source for backend request, authentication, and integration behavior.
+3. Frontend routes, providers, hooks, pages, and feature components for visible application behavior.
+4. Build and hosting configuration for runtime and deployment behavior.
+5. Written documentation as the maintained reference layer.
+
+This order prevents older planning documents from overriding deployed behavior.
+
+### Internal documentation index
+
+Added an internal documentation index that:
+
+- Defines the purpose and audience of the engineering documentation.
+- Links architecture, API, database/state, and setup/deployment references.
+- Records important conventions for the React single-page application, staff authentication, guest sessions, company isolation, and server-only credentials.
+- Makes the live implementation the authority when documents drift.
+
+### Architecture overview
+
+Added an implementation-oriented architecture guide covering:
+
+- Browser application, authentication, data API, database, Edge Functions, and external integration boundaries.
+- Frontend composition, route ownership, top-level providers, React Query behavior, and role-gated navigation.
+- Staff identity, company membership, manager permissions, administrator scope, and guest-session separation.
+- End-to-end flows for staff sign-in, URL-based registration, direct uploads, invitation creation, Advance Invite batches, guest playback, analytics, archiving, restoration, and permanent deletion.
+- Security boundaries for row-level access, service-level operations, signed callbacks, guest tokens, remote poster handling, and configurable page integrations.
+- State ownership across authentication context, company selection, batch progress, local forms, upload recovery, and server state.
+
+### API reference
+
+Created a consolidated reference for all 42 deployed Edge Functions and related data interfaces. It documents:
+
+- Base URL conventions, request methods, content types, and standard error behavior.
+- Public, staff-session, guest-session, signed-callback, shared-secret, and scheduler authentication classes.
+- Guest access-code verification, guest token issuance, view consumption, and viewing-event logging.
+- Single invitations, resend/revoke actions, guest cleanup, and email validation.
+- Advance Invite verification, status polling, individual retries, and completion notifications.
+- Direct, multipart, proxy, URL-based, replacement, duration-sync, status, archive, restore, and delete video operations.
+- Email send, delivery-status, callback, export, analytics, audit, retention, manager, poster, application-setting, and reporting operations.
+- Browser data access and database procedure categories used outside Edge Functions.
+- Request fields, expected responses, authorization rules, idempotency behavior, rate limiting, and notable failure states where applicable.
+
+### Database and state reference
+
+Created a database/state guide based on the live public schema. It covers 24 application tables and includes:
+
+- Tenant, profile, video, poster, protection, invitation, guest, viewing, playback, batch, template, email, settings, audit, retention, and archive data.
+- Entity relationships and ownership paths between companies, users, videos, access codes, batches, and logs.
+- Column purpose, important defaults, tenant ownership, archive behavior, and key lifecycle fields.
+- Row-level access patterns for managers, administrators, company scope, and privileged server operations.
+- Trigger-driven invariants such as company assignment, guest registration, batch-size enforcement, delivery-status synchronization, poster lifecycle, safe configurable markup, and timestamp updates.
+- Database procedures for authorization, guest security, counters, analytics, search, retention, and administrative updates.
+- Frontend state ownership through React Query, authentication context, company filters, Advance Invite progress, local component state, and upload-session persistence.
+
+### Setup and deployment guide
+
+Added operational guidance for:
+
+- Supported runtime prerequisites and local application startup.
+- Build, preview, lint, test, and backend integrity checks.
+- Public browser configuration versus server-only secret categories.
+- Database evolution, grants, row-level access, and privileged procedure safeguards.
+- Staff invitation/profile creation and separate guest-session requirements.
+- Company-scoped video, email, verification, callback, and scheduled-maintenance configuration.
+- Static application hosting and deep-link routing.
+- Independent backend-function deployment and shared-code expectations.
+- Release verification across sign-in, tenant isolation, uploads, invitations, guest access, analytics, exports, archive lifecycle, and callback authentication.
+- Observability and recovery paths for browser, backend, data-access, delivery, and processing failures.
+
+Secret names and configuration categories may be referenced for maintainers, but secret values are never documented.
+
+### Customer Help Center
+
+Created a non-technical help-center collection with four documents:
+
+1. **Help Center index** — audience definitions and links to all guides.
+2. **Getting Started** — account invitation, sign-in, navigation, company selection, profile controls, first upload, first invitation, guest flow, and a first-day checklist.
+3. **Feature Walkthroughs** — Home, Content Library, upload recovery, posters, editing, replacement, standard invitations, guest access, Analytics, Audit Log, Archived data, Settings, manager administration, and the full Advance Invites workflow.
+4. **Troubleshooting & FAQ** — sign-in, missing invitations, permissions, upload configuration, quota, processing, invitation delivery, rate limits, batch verification, failed recipients, guest-code errors, playback, analytics, exports, archives, and account management.
+
+The customer guides intentionally:
+
+- Use visible interface labels instead of implementation terms.
+- Explain role and permission differences without exposing security internals.
+- Avoid normal-user references to internal service vendors.
+- Give safe next actions for start-time, expiry, view-limit, invalid-code, delivery, and rate-limit states.
+- Direct signed-in users to **Get Help** when self-service steps do not resolve an issue.
+
+### Public changelog
+
+Replaced the starter changelog with a customer-facing release entry summarizing:
+
+- The new Help Center.
+- Upload progress, resume, quota, and replacement guidance.
+- Invitation verification, viewing windows, delivery visibility, and guest error messaging.
+- The guided Advance Invites workflow and batch controls.
+- Analytics, archive, audit, settings, and role-based visibility.
+
+The public entry excludes endpoint names, database details, credential names, vendor internals, and engineering-only terminology.
+
+### Review and maintenance notes
+
+Future maintainers should update the affected internal reference whenever routes, tables, procedures, functions, permissions, settings, integration boundaries, or deployment requirements change. Customer-facing guides should be updated whenever visible labels, available actions, role behavior, or user-visible errors change.
