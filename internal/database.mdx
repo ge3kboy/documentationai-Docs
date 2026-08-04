@@ -1,0 +1,317 @@
+---
+title: Database & State
+description: Persistence model, entity relationships, table schemas, RLS policies, triggers, and client state management.
+---
+
+## Database model
+
+The application uses Supabase PostgreSQL as the authoritative store. Browser reads and mutations use PostgREST and RPC with the current user JWT under Row Level Security. Security-sensitive operations run through Edge Functions with the service role after explicit identity validation.
+
+## Entity relationships
+
+Most business entities carry a `company_id` for tenant isolation. Policies compare it to the current user's company. Archive tables preserve historical rows even when live foreign-key targets are later removed.
+
+- **companies** — profiles, videos, company_settings, company_video_protection_settings
+- **profiles** — videos, admin_audit_log
+- **videos** — access_codes, poster_images
+- **access_codes** — guest_viewing_logs, playback_events, email_events
+- **companies** — invited_guests, bulk_invite_jobs, bulk_invite_templates
+- **bulk_invite_jobs** — bulk_invite_job_items — access_codes
+
+## Table schemas
+
+The schema groups cleanly by tenant identity, video management, invitations, analytics, settings, and operational data. The lists below focus on the columns that define ownership, lifecycle, defaults, and important constraints.
+
+### Tenancy and identity
+
+`companies` stores tenant records and upload/provider configuration.
+
+- **`id`** — `uuid`, primary key
+- **`name`** — `text`, required
+- **`created_at`** — `timestamptz`, created timestamp
+- **`upload_prefix_url`** — `text`, optional upload path prefix
+- **`subdomain`** — `text`, optional tenant slug
+- **`gumlet_collection_id`** — `text`, optional provider collection identifier
+
+`profiles` binds authenticated users to a company and role.
+
+- **`id`** — `uuid`, primary key, matches auth user ID
+- **`email`** — `text`, required
+- **`role`** — `text`, manager or admin
+- **`can_access_analytics`** — `boolean`, feature flag
+- **`company_id`** — `uuid`, tenant foreign key
+- **`can_use_advanced_invites`** — `boolean`, feature flag
+
+### Video domain
+
+`videos` stores upload state, provider linkage, ownership, and archive lifecycle.
+
+- **`id`** — `uuid`, primary key
+- **`user_id`** — `uuid`, creator profile reference
+- **`title`** — `text`, required
+- **`description`** — `text`, optional
+- **`poster_url`** — `text`, optional
+- **`duration`** — numeric duration field
+- **`gumlet_asset_id`** — `text`, provider asset identifier
+- **`status`** — `text`, `pending`, `uploading`, `processing`, `ready`, `failed`, or `archive`
+- **`created_at`** — `timestamptz`, created timestamp
+- **`is_deleted`** — `boolean`, soft-delete flag
+- **`company_id`** — `uuid`, tenant foreign key
+- **`archived_at`** — `timestamptz`, archive timestamp
+- **`deleted_at`** — `timestamptz`, hard-delete lifecycle marker
+- **`upload_origin`** — `text`, upload path/source marker
+
+`poster_images` tracks stored poster assets and their lifecycle.
+
+- **`id`** — `uuid`, primary key
+- **`company_id`** — `uuid`, tenant foreign key
+- **`video_id`** — `uuid`, related video
+- **`storage_path`** — `text`, object storage path
+- **`public_url`** — `text`, resolved asset URL
+- **`original_source`** — `text`, original remote source
+- **`uploaded_by_user_id`** — `uuid`, uploader profile
+- **`size_bytes`** — numeric byte size
+- **`width`** — integer image width
+- **`height`** — integer image height
+- **`is_archived`** — `boolean`, archive flag
+- **`orphaned_at`** — `timestamptz`, cleanup marker
+- **`created_at`** — `timestamptz`, created timestamp
+- **`usage_context`** — `text`, intended usage marker
+
+`company_video_protection_settings` stores per-company playback protection settings.
+
+- **`company_id`** — `uuid`, primary key
+- **`signed_urls_enabled`** — `boolean`, protection toggle
+- **`gumlet_sign_secret`** — `text`, signing secret
+- **`signed_url_ttl_seconds`** — integer TTL
+- **`watermark_email_enabled`** — `boolean`, email watermark toggle
+- **`watermark_ip_enabled`** — `boolean`, IP watermark toggle
+
+### Invitations and guests
+
+`access_codes` stores invitation lifecycle, guest limits, and delivery state.
+
+- **`id`** — `uuid`, primary key
+- **`video_id`** — `uuid`, related video
+- **`guest_email`** — `text`, required
+- **`code`** — `text`, invite/access token value
+- **`views_allowed`** — integer, default `10`
+- **`views_used`** — integer, default `0`
+- **`expires_at`** — `timestamptz`, required
+- **`created_by_user_id`** — `uuid`, creator profile
+- **`created_at`** — `timestamptz`, created timestamp
+- **`last_used_at`** — `timestamptz`, latest consumption time
+- **`company_id`** — `uuid`, tenant foreign key
+- **`starts_at`** — `timestamptz`, optional access start
+- **`display_timezone`** — `text`, presentation timezone
+- **`job_item_id`** — `uuid`, optional bulk invite linkage
+- **`latest_email_delivery_status`** — `text`, denormalized terminal status
+- **`latest_email_delivery_status_at`** — `timestamptz`, status update timestamp
+
+`invited_guests` keeps one guest record per company email.
+
+- **`id`** — `uuid`, primary key
+- **`admin_id`** — `uuid`, inviting admin/profile
+- **`guest_email`** — `text`, required
+- **`created_at`** — `timestamptz`, created timestamp
+- **`company_id`** — `uuid`, tenant foreign key
+- **Constraint** — unique guest email per company
+
+### Viewing and analytics
+
+`guest_viewing_logs` records guest access sessions after backend token validation.
+
+- **`id`** — `uuid`, primary key
+- **`access_code_id`** — `uuid`, related access code
+- **`video_id`** — `uuid`, related video
+- **`guest_email`** — `text`, denormalized guest identifier
+- **`view_start_at`** — `timestamptz`, session start
+- **`device`** — `text`, device or user-agent summary
+- **`created_at`** — `timestamptz`, insert timestamp
+- **`session_id`** — `text`, playback session identifier
+- **`duration_watched`** — numeric accumulated duration
+
+`playback_events` stores finer-grained playback telemetry.
+
+- **`id`** — `uuid`, primary key
+- **`session_id`** — `text`, playback session identifier
+- **`access_code_id`** — `uuid`, related access code
+- **`video_id`** — `uuid`, related video
+- **`guest_email`** — `text`, denormalized guest identifier
+- **`event_type`** — `text`, playback event class
+- **`timestamp_seconds`** — numeric in-video timestamp
+- **`created_at`** — `timestamptz`, event timestamp
+
+### Advanced invitations and email
+
+`bulk_invite_jobs` represents batch invitation work and aggregate status.
+
+- **`id`** — `uuid`, primary key
+- **`company_id`** — `uuid`, tenant foreign key
+- **`created_by_user_id`** — `uuid`, job creator
+- **`video_id`** — `uuid`, target video
+- **`starts_at`** — `timestamptz`, optional access start
+- **`expires_at`** — `timestamptz`, required expiry
+- **`display_timezone`** — `text`, presentation timezone
+- **`email_template`** — `text`, rendered batch template
+- **`status`** — `text`, default `draft`
+- **`total_count`** — integer, aggregate item count
+- **`counts`** — `jsonb`, state counters
+- **`created_at`** — `timestamptz`, created timestamp
+- **`updated_at`** — `timestamptz`, updated timestamp
+- **`name`** — `text`, job label
+- **`soft_deleted_at`** — `timestamptz`, soft-delete marker
+- **`archive_queued_at`** — `timestamptz`, retention workflow marker
+
+`bulk_invite_job_items` stores per-recipient verification and send state.
+
+- **`id`** — `uuid`, primary key
+- **`job_id`** — `uuid`, parent job
+- **`email`** — `text`, required recipient
+- **`bucket`** — `text`, default `new`
+- **`verification_status`** — `text`, provider verification result
+- **`state`** — `text`, default `pending_verification`
+- **`attempt_count`** — integer, retry counter
+- **`last_error`** — `text`, latest failure reason
+- **`access_code_id`** — `uuid`, created invite linkage
+- **`bounced`** — `boolean`, bounce marker
+- **Timestamps** — created and updated lifecycle fields
+
+`bulk_invite_templates` stores reusable invitation templates.
+
+- **`id`** — `uuid`, primary key
+- **`company_id`** — `uuid`, tenant foreign key
+- **`creator`** — `uuid`, author profile
+- **`name`** — `text`, required template name
+- **`body`** — `text`, required template body
+- **`is_default`** — `boolean`, default selection flag
+- **Timestamps** — created and updated lifecycle fields
+
+`email_events` normalizes outbound email delivery activity.
+
+- **`id`** — `uuid`, primary key
+- **`provider`** — `text`, delivery provider
+- **`provider_message_id`** — `text`, provider-side message identifier
+- **`company_id`** — `uuid`, tenant foreign key
+- **`access_code_id`** — `uuid`, optional invite linkage
+- **`job_item_id`** — `uuid`, optional batch item linkage
+- **`recipient`** — `text`, destination email
+- **`subject`** — `text`, message subject
+- **`event`** — `text`, normalized delivery event
+- **`reason`** — `text`, optional terminal reason
+- **`meta`** — `jsonb`, provider payload details
+- **Timestamps** — event and write timestamps
+
+`email_bounces` stores aggregated bounce history by address.
+
+- **`id`** — `uuid`, primary key
+- **`company_id`** — `uuid`, tenant foreign key
+- **`email`** — `text`, bounced address
+- **`first_bounce_at`** — `timestamptz`, first observed bounce
+- **`last_bounce_at`** — `timestamptz`, most recent bounce
+- **`bounce_count`** — integer, accumulated count
+- **`reason`** — `text`, normalized bounce reason
+- **`provider`** — `text`, source provider
+- **`details`** — `jsonb`, provider detail payload
+- **Timestamps** — write lifecycle fields
+
+`email_send_counters` stores rate-limit windows.
+
+- **`company_id`** — `uuid`, tenant foreign key
+- **`bucket`** — `text`, counter bucket
+- **`window_type`** — `text`, window granularity
+- **`window_started_at`** — `timestamptz`, window start
+- **`count`** — integer, current usage
+- **`updated_at`** — `timestamptz`, last increment time
+
+### Settings and integrations
+
+`company_settings` stores per-company configuration values.
+
+- **`id`** — `uuid`, primary key
+- **`company_id`** — `uuid`, tenant foreign key
+- **`key`** — `text`, setting name
+- **`value`** — `jsonb`, setting payload
+- **Timestamps** — created and updated lifecycle fields
+
+`public_settings` stores globally readable configuration.
+
+- **`key`** — `text`, primary key
+- **`value`** — `jsonb`, setting payload
+- **`updated_at`** — `timestamptz`, last modification time
+
+`allowed_script_hosts` stores approved integration hosts.
+
+- **`host`** — `text`, primary key
+- **`created_at`** — `timestamptz`, created timestamp
+
+### Audit, retention, and operations
+
+`admin_audit_log` records privileged actions and supporting context.
+
+- **`id`** — `uuid`, primary key
+- **`admin_id`** — `uuid`, acting profile
+- **`action`** — `text`, audit action name
+- **`resource_id`** — `text` or `uuid`, target identifier
+- **`resource_type`** — `text`, target entity class
+- **`details`** — `jsonb`, contextual payload
+- **`ip_address`** — `text`, source IP
+- **`created_at`** — `timestamptz`, write timestamp
+
+`failed_access_attempts` stores public verification failures for rate limiting.
+
+- **`id`** — `uuid`, primary key
+- **`ip_address`** — `text`, client address
+- **`attempt_at`** — `timestamptz`, failure timestamp
+
+## Row-Level Security (RLS)
+
+All listed public application tables have RLS enabled. Most business entities carry `company_id`; policies compare it to `get_my_company_id()`. Administrators receive broader access, while the super-admin helper allows global scope.
+
+<Callout kind="alert">
+
+Browser PostgREST calls operate with the authenticated JWT and are tenant-scoped by policies. An empty result can mean no matching permitted row. Writes can fail if `WITH CHECK` rejects tenant fields.
+
+</Callout>
+
+## Triggers
+
+Triggers fill in tenant context, maintain derived records, and keep denormalized status fields in sync.
+
+- **Videos insert trigger** — supplies the actor's company when omitted
+- **Poster lifecycle triggers** — run after insert or update on videos
+- **Access codes insert trigger** — upserts recipient into `invited_guests`
+- **Bulk invite jobs trigger** — enforces company max batch size
+- **Email events trigger** — updates `access_codes.latest_email_delivery_status` from terminal events
+- **Public settings triggers** — validate script integration hosts and update timestamps
+
+## Client state management
+
+The application uses server state rather than a global client store for most data.
+
+- **React Query** — fetched entities, loading and error state, cache freshness, and mutation invalidation
+- **AuthProvider** — session, user, and profile
+- **CompanyFilterProvider** — selected company filter for admins
+- **Local component state** — forms, dialogs, tabs, selection, and upload progress
+- **Browser persistence** — limited to upload progress and recovery
+- **PostgreSQL** — authoritative for permissions, counters, status, and relationships
+
+## Next steps
+
+<Columns cols={3}>
+  <Card title="Architecture Overview" href="/internal/architecture" icon="server" horizontal="false">
+  
+  System architecture and data flows.
+  
+  </Card>
+  <Card title="Edge Functions API" href="/api-reference/edge-functions" icon="code" horizontal="false">
+  
+  API reference for all backend endpoints.
+  
+  </Card>
+  <Card title="Setup & Deployment" href="/internal/setup-and-deployment" icon="rocket" horizontal="false">
+  
+  Local development and deployment.
+  
+  </Card>
+</Columns>

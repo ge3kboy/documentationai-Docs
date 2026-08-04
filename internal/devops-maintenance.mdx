@@ -1,0 +1,293 @@
+---
+title: DevOps & Maintenance
+description: Local setup, secrets, deployment, backup, monitoring, operational runbooks, and security audits for ScreenThis.
+---
+
+## Local setup
+
+Run ScreenThis locally with Node.js LTS and access to the Supabase project that backs the application. The frontend currently embeds the Supabase URL and anon key in `src/integrations/supabase/client.ts`, while Edge Functions depend on server-side secrets managed in Supabase.
+
+<Callout kind="info">
+
+Local frontend work does not require moving the embedded anon credentials first. If the project later standardizes environment variable usage, move frontend values to build-time environment variables rather than duplicating them across files.
+
+</Callout>
+
+### Prerequisites
+
+- **Node.js** — use an LTS release.
+- **Repository access** — clone the application repository locally.
+- **Supabase project access** — required for Edge Function work, secret management, and production troubleshooting.
+
+### Typical local workflow
+
+```bash
+npm install
+npm run dev
+```
+
+Use the frontend source to verify the current Supabase client configuration:
+
+```bash
+sed -n '1,160p' src/integrations/supabase/client.ts
+```
+
+If you are changing Edge Functions, verify that the target Supabase project has the required secrets before testing or deploying.
+
+## Secrets
+
+Manage production and staging function secrets in Supabase under Project → Edge Functions → Manage Secrets. Treat every value in this section as server-side material, especially signing keys, webhook secrets, and the service role key.
+
+<Callout kind="alert">
+
+Never expose `SUPABASE_SERVICE_ROLE_KEY`, `JWT_SECRET`, webhook secrets, or provider API keys in browser bundles, client-side source, logs, or support screenshots.
+
+</Callout>
+
+### Frontend credential location
+
+The frontend currently stores these values in `src/integrations/supabase/client.ts`:
+
+| Location | Values | Notes |
+|---|---|---|
+| `src/integrations/supabase/client.ts` | Supabase URL, Supabase anon key | Embedded for frontend anon access today |
+
+### Edge Function secrets reference
+
+| Secret | Used for | Notes |
+|---|---|---|
+| `SUPABASE_URL` | Supabase project connection | Required by Edge Functions |
+| `SUPABASE_ANON_KEY` | Anon access in server workflows where needed | Keep aligned with the target project |
+| `SUPABASE_SERVICE_ROLE_KEY` | Privileged Supabase access | High-risk credential |
+| `JWT_SECRET` | Signing and verifying guest JWTs | Rotate when compromise is suspected |
+| `RESEND_API_KEY` | Transactional email delivery | Required for invite and email flows |
+| `PUBLIC_WEB_URL` | Base URL for links generated in emails | Must match the target environment |
+| `GUMLET_WEBHOOK_SECRET` | HMAC verification for Gumlet webhooks | Must match provider configuration |
+| `PABBLY_STATUS_WEBHOOK_SECRET` | Shared-secret verification for Pabbly status webhooks | Must match workflow configuration |
+
+### Inspect and update secrets
+
+Use the Supabase dashboard for routine management. When preparing a release, confirm that the target environment contains every required secret and that provider-side webhook settings still match the deployed project.
+
+```bash
+# Example verification checklist to run locally before release notes or handoff
+printf '%s\n' \
+  SUPABASE_URL \
+  SUPABASE_ANON_KEY \
+  SUPABASE_SERVICE_ROLE_KEY \
+  JWT_SECRET \
+  RESEND_API_KEY \
+  PUBLIC_WEB_URL \
+  GUMLET_WEBHOOK_SECRET \
+  PABBLY_STATUS_WEBHOOK_SECRET
+```
+
+<Callout kind="info">
+
+When you promote changes across environments, verify both sides of each integration. A correctly deployed function still fails if Gumlet, Pabbly, or Resend points at the wrong project or uses an outdated secret.
+
+</Callout>
+
+## Deployment workflow
+
+Deploy the frontend through Vercel and deploy backend changes through the Supabase pipeline that applies Edge Functions and migrations from the repository. Keep frontend and backend rollout timing coordinated when a release depends on both.
+
+### Frontend deployment
+
+A git push triggers the Vercel deployment flow for the single-page app.
+
+```bash
+git push origin main
+```
+
+Vercel serves the built SPA after the deploy completes. Confirm that the target build uses the intended branch, environment, and domain.
+
+### Backend deployment
+
+Backend changes live in the repository under `supabase/functions/` and `supabase/migrations/`. The deployment pipeline applies those changes to the target Supabase project.
+
+```bash
+git status
+git add supabase/functions supabase/migrations
+git commit -m "Update edge functions and migrations"
+git push origin main
+```
+
+### Release verification
+
+After deployment, verify the release from the application edge inward rather than starting in the database. This catches integration failures that schema checks alone miss.
+
+- Production frontend build completes successfully.
+- Changed Edge Functions deploy to the intended Supabase project.
+- Required secrets exist in the target project.
+- Webhook providers point at the correct project URL.
+- Smoke tests pass for login, guest access, invites, uploads, and analytics.
+- No service-role or provider secrets appear in browser bundles or network responses.
+
+<Callout kind="info">
+
+Edge Functions should not assume platform-level authentication. A function is trusted only when it explicitly authenticates the caller with `auth.getUser`, verifies a guest JWT, or validates a webhook signature or shared secret.
+
+</Callout>
+
+## Backup and recovery
+
+Use Supabase automated backups as the baseline recovery control, then layer periodic table exports for the data you would need most during an incident. Automated backups protect against major failures, while targeted exports reduce recovery time for operational mistakes or partial data loss.
+
+### Baseline backup policy
+
+- Enable **Supabase automated backups** in project settings.
+- Periodically export critical tables.
+- Store exports in a secure bucket with restricted access.
+- Test restoration workflows periodically instead of assuming backups are usable.
+
+### Critical tables to export
+
+| Table | Why it matters |
+|---|---|
+| `videos` | Core video records and processing state |
+| `access_codes` | Guest access control data |
+| `guest_viewing_logs` | Access and viewing history |
+| `admin_audit_log` | Administrative change history |
+| `company_settings` | Tenant-specific configuration |
+| `profiles` | User profile records |
+| `companies` | Tenant identity and scoping data |
+
+### Recovery priorities
+
+Restore tenant and identity data first, then access controls, then media-related operational state. That order gives you the fastest path to restoring safe access without widening exposure across companies.
+
+<Callout kind="alert">
+
+Do not store database exports in broadly accessible buckets or shared team folders. Backup files can contain tenant data, audit trails, and access-control information even when they do not include provider secrets.
+
+</Callout>
+
+## Logging and monitoring
+
+Troubleshoot backend behavior in Supabase Edge Function logs and inspect browser console output for client-side failures. These are the current system-of-record log locations for most production issues.
+
+### Current logging locations
+
+| Source | Where to check | Typical use |
+|---|---|---|
+| Edge Functions | Supabase function logs | Webhook handling, access verification, email flows, server errors |
+| Client application | Browser console and network panel | Frontend state, failed requests, auth issues, rendering failures |
+
+### Recommended additions
+
+Add centralized error reporting if incident volume or debugging time justifies it. A service such as Sentry can reduce time to resolution when failures span client code, Edge Functions, and release boundaries.
+
+Keep product analytics separate from viewing logs. Viewing activity can carry privacy implications, so operational telemetry and behavioral analytics should remain clearly scoped and privacy-aware.
+
+### What to inspect by failure type
+
+- **Browser failures** — client console and network requests.
+- **Backend failures** — Supabase Edge Function logs.
+- **Data or authorization failures** — PostgREST or RPC errors and the applicable RLS policy.
+- **Delivery failures** — `email_events`, `email_bounces`, and provider delivery logs.
+- **Video processing failures** — `videos.status`, provider asset state, and webhook logs.
+
+<Callout kind="info">
+
+Function log lines are generally easier to search when they include the function name. If debugging becomes slow, standardize log prefixes across functions before adding more tooling.
+
+</Callout>
+
+## Operational runbooks
+
+Start with the narrowest system boundary that can explain the symptom. Most incidents on this stack reduce to one of four categories: invalid access state, missing or mismatched secrets, provider webhook drift, or tenant-scoping and policy errors.
+
+### Guests cannot access a video
+
+<Steps>
+  <Step title="Validate the access code state" icon="check-circle">
+
+  Confirm that the access code exists and is still usable. Check expiry, remaining views, and any related timing constraints before investigating infrastructure.
+
+  Success signal: the access code record exists and the intended guest still meets the access rules.
+
+  </Step>
+  <Step title="Check rate limiting" icon="shield">
+
+  Inspect whether repeated invalid attempts triggered rate limiting through `failed_access_attempts`. A valid code can still fail if recent retries pushed the guest into a blocked state.
+
+  Success signal: rate limiting is not blocking the request, or you have identified that rate limiting is the immediate cause.
+
+  </Step>
+  <Step title="Inspect verify-access-code function logs" icon="terminal">
+
+  Review Supabase logs for the `verify-access-code` Edge Function. Look for token-signing failures, policy failures, malformed requests, or rejected guest state.
+
+  Success signal: the logs identify a concrete cause such as expired code, failed verification, or downstream data error.
+
+  </Step>
+</Steps>
+
+### Video is stuck in pending or processing
+
+<Steps>
+  <Step title="Confirm the Pabbly workflow executed" icon="check-circle">
+
+  Verify that the expected Pabbly automation ran for the affected upload. If the workflow never fired or failed before sending status data, the video record will not advance.
+
+  Success signal: Pabbly shows a successful run for the affected asset or clearly shows where the workflow stopped.
+
+  </Step>
+  <Step title="Verify Gumlet webhook configuration and secret" icon="shield">
+
+  Confirm that Gumlet points to the correct webhook endpoint and that the configured signing secret matches `GUMLET_WEBHOOK_SECRET` in the target Supabase project.
+
+  Success signal: webhook deliveries reach the expected project and signature verification succeeds.
+
+  </Step>
+  <Step title="Check the video record for provider linkage" icon="database">
+
+  Inspect the affected `videos` row and confirm that `gumlet_asset_id` is populated correctly. Without the provider asset identifier, status updates cannot map back to the application record.
+
+  Success signal: the video row contains the expected provider asset ID and incoming updates can resolve to that record.
+
+  </Step>
+</Steps>
+
+### Invites are not being delivered
+
+<Steps>
+  <Step title="Confirm the email provider secret exists" icon="lock">
+
+  Verify that `RESEND_API_KEY` is present in the target Supabase project. Missing or stale credentials are the fastest explanation for delivery failures after an otherwise healthy deploy.
+
+  Success signal: the environment contains a valid Resend API key for the intended account.
+
+  </Step>
+  <Step title="Inspect provider delivery logs" icon="terminal">
+
+  Check Resend delivery logs for rejections, bounces, authentication failures, or domain-level sending issues. Pair those results with application-side events when available.
+
+  Success signal: the provider shows a delivered message or a specific rejection reason you can act on.
+
+  </Step>
+</Steps>
+
+## Security audits
+
+Audit access boundaries first, then verify request authenticity, then review secret handling. That order catches the highest-impact failures early.
+
+<Callout kind="alert">
+
+Any unintended public read path, leaked service credential, or unverified external webhook should be treated as a production security incident until proven otherwise.
+
+</Callout>
+
+### Audit checklist
+
+- **RLS coverage** — confirm RLS is enabled on all public tables.
+- **Public exposure** — confirm no unintended public read policies exist.
+- **Webhook authenticity** — confirm Edge Functions verify external webhook signatures or shared secrets.
+- **Guest token security** — confirm `JWT_SECRET` is protected and rotated when necessary.
+
+### High-risk review points
+
+Pay extra attention to multi-tenant isolation and guest access flows. A subtle RLS regression or token-verification gap can expose data across companies even when the frontend appears to filter correctly.
+
+Review browser bundles and network responses during release verification. Service-role keys, provider secrets, and signing material must remain server-side at all times.

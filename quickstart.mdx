@@ -1,58 +1,120 @@
 ---
-title: Quickstart
-description: Minimal steps to customize this sample starter kit.
+title: Getting Started
+description: >-
+  From account invitation to your first shared video — a complete first-day
+  walkthrough for new ScreenThis users.
 ---
-## Overview
+## Get from account invitation to your first shared video in one session. You will sign in, upload a video, send a private invitation, and verify the guest viewing flow.
 
-<Callout kind="alert" collapsed="false">
-  This site ships with placeholder content. Use this quickstart to replace it with your real product docs.
+<Callout kind="info" collapsed="false">
+  You should have received an email invitation from your ScreenThis administrator. If not, contact your admin to resend it. Guests do not need an account — only managers and administrators sign in.
 </Callout>
 
-## 1. Update a page
+## Sign in to your account
 
 <Steps>
-  <Step title="Edit introduction" icon="edit" title-type="p">
-    Replace the sample introduction with a concise overview of your product and the key actions you want new users to take first.
+  <Step title="Open your invitation email" icon="mail" title-type="p">
+    Find the account setup link sent to your work address.
   </Step>
 
-  <Step title="Preview your change" icon="monitor" title-type="p">
-    Use your dashboard board editor to confirm the updated introduction looks and reads as expected.
+  <Step title="Set your password" icon="key" title-type="p">
+    Follow the link and choose a password with at least eight characters.
+  </Step>
+
+  <Step title="Sign in" icon="log-in" title-type="p">
+    Return to the ScreenThis portal, enter your email and password, and select Sign In.
   </Step>
 </Steps>
 
-## 2. Add a new page
+If the invitation link no longer works, ask your administrator to resend it. After a successful sign-in, ScreenThis opens the main portal.
+
+## Navigate the dashboard
+
+The left menu gives you the core workflows you will use on your first day. Start with Home for quick invitations and Content Library for uploads, then use the other sections as your role allows.
+
+- **Home** — Send a quick invitation, view invitation totals, and review recent invitations.
+- **Content Library** — Upload, find, edit, replace, archive, and invite guests to videos.
+- **Analytics** — Review video, invitation, guest, and viewing activity. Some accounts require additional permission.
+- **Advance Invites** — Prepare, verify, and send invitations to a group. This option must be enabled for your company.
+
+Your profile menu appears in the upper-right corner under your initials or profile image. Use it to confirm your role, verify your email address, change your password, or log out.
+
+## Upload your first video
 
 <Steps>
-  <Step title="Add a page" icon="file-text" title-type="p">
-    Create a new `page` by clicking on the + button from the left navigation bar of dashboard. If you are using git, create the .mdx file and add to navigation bar using documentation.json
+  <Step title="Open Content Library" icon="folder" title-type="p">
+    Navigate to Content Library from the left menu.
+  </Step>
+
+  <Step title="Select Video Upload" icon="upload" title-type="p">
+    Click the Video Upload button and choose Browse Files.
+  </Step>
+
+  <Step title="Enter details" icon="edit" title-type="p">
+    Add a clear title and optionally a poster image.
+  </Step>
+
+  <Step title="Start upload" icon="play" title-type="p">
+    Select Start Upload and keep the page open until processing completes.
   </Step>
 </Steps>
 
-## Example onboarding flow (replace with yours)
+<Callout kind="warning" collapsed="false">
+  Processing can take twice the video length or more. Wait until the status shows Ready before sending invitations.
+</Callout>
 
-1. Sign up for an account and verify your email.
+When the upload finishes, review the file size and duration shown in the upload screen. Your video is ready to share only after processing completes and the status changes to Ready.
 
-2. Create your first workspace, project, or environment.
+## Send your first invitation
 
-3. Add one integration or data source to connect your existing tools.
+<Steps>
+  <Step title="Find Invite To View" icon="layout-dashboard" title-type="p">
+    Open Home or Content Library and locate the Invite To View section.
+  </Step>
 
-4. Complete a guided action (for example, run your first job or publish your first resource).
+  <Step title="Select a video" icon="video" title-type="p">
+    Search for and select a video with Ready status.
+  </Step>
 
-5. Invite a teammate and assign a basic role or permission.
+  <Step title="Enter guest details" icon="mail" title-type="p">
+    Type the guest email, choose an expiry date, and set views allowed at at least 1.
+  </Step>
 
-## 3. Connect API Reference (optional)
+  <Step title="Send invite" icon="send" title-type="p">
+    Select Send Invite and wait for email verification and delivery.
+  </Step>
+</Steps>
 
-If you have an API, replace `openapi.yaml` with your real OpenAPI file. If you do not need an API reference, remove that tab either from dashboard or  `documentation.json`.
+A successful invitation creates a unique six-character access code and sends the guest a private email link. You can review the invitation from Home after delivery starts.
+
+## Understand the guest experience
+
+Guests receive an email link and a six-character code. They open the link or the Guest Access page, enter the code, accept the terms and conditions, and select Access Video.
+
+ScreenThis then checks the invitation rules, including the viewing window, expiration date, and remaining views. If access is allowed, the protected player opens with the video watermark applied. Guests never create passwords or ScreenThis accounts.
+
+## First-day checklist
+
+<Callout kind="tip" collapsed="false">
+  - Sign in successfully with your invited email address
+  - Change your temporary password if needed
+  - Open Content Library and confirm uploads are available
+  - Upload one short test video
+  - Wait until the test video shows Ready
+  - Send a test invitation to an address you can access
+  - Open the guest link and verify the code, terms, and playback flow
+  - Review the invitation on Home
+  - Check Analytics if your role includes access
+</Callout>
 
 ## Next steps
 
 <Columns cols="2">
-  <Card title="Core Concepts" href="/concepts" icon="layers" horizontal="false">
-    Keep the mental model simple and easy to scan.
+  <Card title="User Journeys" href="/concepts" icon="layers" horizontal="false">
+    See how managers and guests move through ScreenThis.
   </Card>
 
-  <Card title="Authentication" href="/authentication" icon="lock" horizontal="false">
-    Add your real auth flows and security notes.
+  <Card title="Home & Invitations" href="/guides/home-and-invitations" icon="layout-dashboard" horizontal="false">
+    Explore the dashboard and manage invitations in detail.
   </Card>
 </Columns>
-

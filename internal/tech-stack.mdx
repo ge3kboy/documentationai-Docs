@@ -1,0 +1,109 @@
+---
+title: Tech Stack
+description: React 18, TypeScript, Vite, Supabase, Gumlet, Pabbly Connect, Resend, and Vercel — the ScreenThis technology stack.
+---
+
+## Tech stack at a glance
+
+ScreenThis is built as a Vite + React single-page application with a Supabase backend. The stack prioritizes type safety, tenant isolation, and security-sensitive operations on the server side.
+
+## Frontend
+
+The frontend is a client-rendered SPA built around React, TypeScript, and a lightweight routing and state-management layer. UI composition relies on accessible primitives, utility-first styling, and a small set of focused libraries for animation, charts, and icons.
+
+<Columns cols="3">
+  <Card title="React 18" href="#" icon="atom" horizontal="false">
+    UI framework with hooks and concurrent rendering.
+  </Card>
+  <Card title="TypeScript" href="#" icon="code" horizontal="false">
+    Type-safe development across the entire frontend.
+  </Card>
+  <Card title="Vite 6" href="#" icon="zap" horizontal="false">
+    Build tool and dev server with fast HMR.
+  </Card>
+  <Card title="React Router" href="#" icon="route" horizontal="false">
+    Client-side routing for the SPA.
+  </Card>
+  <Card title="React Query" href="#" icon="database" horizontal="false">
+    Data fetching, caching, and mutation management.
+  </Card>
+  <Card title="shadcn/ui + Radix" href="#" icon="layout-grid" horizontal="false">
+    UI primitives and accessible components.
+  </Card>
+  <Card title="Tailwind CSS" href="#" icon="palette" horizontal="false">
+    Utility-first styling.
+  </Card>
+  <Card title="Framer Motion" href="#" icon="wind" horizontal="false">
+    Animations and transitions.
+  </Card>
+  <Card title="Recharts" href="#" icon="bar-chart" horizontal="false">
+    Charts and data visualization.
+  </Card>
+</Columns>
+
+## Backend & Data
+
+Supabase provides the application backend, including the PostgreSQL database, authentication, and Edge Functions. The backend enforces tenant boundaries with Row Level Security and keeps privileged operations out of the browser.
+
+<Columns cols="2">
+  <Card title="Supabase" href="#" icon="server" horizontal="false">
+    PostgreSQL database with Row Level Security, email/password authentication, and Deno Edge Functions.
+  </Card>
+</Columns>
+
+## Video & Integrations
+
+Video delivery and workflow automation are handled by external services, with ScreenThis coordinating them through server-side functions and callbacks. This keeps ingest, playback, and provider status changes within a controlled integration layer.
+
+<Columns cols="2">
+  <Card title="Gumlet" href="#" icon="video" horizontal="false">
+    Video hosting, transcoding, DRM, watermarking, and playback via embedded player.
+  </Card>
+  <Card title="Pabbly Connect" href="#" icon="workflow" horizontal="false">
+    Webhook-based automation for video ingest with status callbacks.
+  </Card>
+</Columns>
+
+## Email
+
+Transactional email flows run through a dedicated provider rather than directly from the client. Invitation delivery, notifications, and related email actions are triggered from Edge Functions.
+
+<Columns cols="1">
+  <Card title="Resend" href="#" icon="mail" horizontal="false">
+    Transactional email delivery integrated through Edge Functions for invitations and notifications.
+  </Card>
+</Columns>
+
+## Hosting
+
+The frontend deploys as a Vite-built SPA on Vercel. Build and deployment stay separate from backend execution, which continues to run through Supabase services.
+
+<Columns cols="1">
+  <Card title="Vercel" href="#" icon="rocket" horizontal="false">
+    Static SPA hosting with edge deployment and automatic builds on git push.
+  </Card>
+</Columns>
+
+## Key conventions
+
+A few architectural conventions shape how the codebase is organized and how security decisions are made. These conventions matter more than the library list because they affect routing, data access, and authentication boundaries.
+
+<Callout kind="info">
+ScreenThis uses a multi-tenant company model with company-scoped settings. Guest access does not use Supabase Auth — it uses a custom, short-lived guest JWT signed with a separate secret.
+</Callout>
+
+## Next steps
+
+Use these pages to move from the technology inventory into implementation details. They cover the system structure, persistent data model, and local and deployed environments.
+
+<Columns cols="3">
+  <Card title="Architecture Overview" href="/internal/architecture" icon="server" horizontal="false">
+    System architecture and data flows.
+  </Card>
+  <Card title="Database & State" href="/internal/database" icon="database" horizontal="false">
+    Table schemas and RLS policies.
+  </Card>
+  <Card title="Setup & Deployment" href="/internal/setup-and-deployment" icon="rocket" horizontal="false">
+    Local development and deployment.
+  </Card>
+</Columns>

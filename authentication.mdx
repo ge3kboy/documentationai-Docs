@@ -1,57 +1,109 @@
 ---
-title: Authentication (Sample)
-description: Sample guidance for authentication and OpenAPI usage.
+title: Authentication
+description: Two-tier auth model — Supabase Auth for staff (email/password, role-based) and a guest JWT system for controlled video access.
 ---
 
-## Overview
+## Authentication model
 
-This is sample content. Replace tokens, URLs, headers, and flows with your real authentication requirements.
+ScreenThis uses a two-tier authentication model. Staff, including managers and admins, authenticate through Supabase Auth with email and password. Guests do not create accounts — they exchange a six-character access code for a short-lived guest JWT that grants controlled video access.
+
+## Staff Authentication (Supabase Auth)
+
+Staff sessions are managed by Supabase Auth. The frontend tracks the session and loads the matching `public.profiles` row, which carries the role, company membership, and feature permissions used across the app and Edge Functions.
+
+- **`role`** — `admin` or `manager`
+- **`company_id`** — tenant membership
+- **`can_access_analytics`** — boolean
+- **`can_use_advanced_invites`** — boolean
 
 <Callout kind="info">
 
-This site ships with placeholder content for authentication. Update this page and `openapi.yaml` to match your real API before sharing with users.
+The staff JWT is automatically forwarded by the Supabase browser client. No manual token management is needed for PostgREST or RPC calls.
 
 </Callout>
 
-This API uses OpenAPI to describe endpoints, parameters, and responses. The reference is generated from `openapi.yaml`, so keep that file up to date as your API evolves.
+## Guest JWT System
 
-## Authentication
+Guests authenticate through a three-step flow that does not require a Supabase account. The server validates the access code, checks expiry and view limits, and issues a short-lived HS256 JWT.
 
-Use a bearer token in the `Authorization` header for authenticated requests. Replace the base URL and token with values for your own API.
+<Steps>
+  <Step title="Verify access code" icon="key" title-type="p">
+
+  The guest submits a six-character code to the `verify-access-code` Edge Function. This endpoint is public and rate-limited by IP. After 10 failed attempts in 15 minutes, the function returns `429`.
+
+  </Step>
+  <Step title="Generate guest token" icon="shield" title-type="p">
+
+  The guest requests a token from `generate-guest-token`. The server rechecks expiry and view limits, atomically increments the view count, and signs an HS256 JWT containing the server-derived `access_code_id`, `guest_email`, and `session_id`.
+
+  </Step>
+  <Step title="Log viewing events" icon="eye" title-type="p">
+
+  The guest JWT is used as a Bearer token for `log-guest-viewing-event`. The function manually verifies the token and rejects mismatched video or email context.
+
+  </Step>
+</Steps>
+
+<Callout kind="alert">
+
+The client-supplied email is never trusted for token issuance or logging. The guest JWT contains the server-derived email, not what the browser sends.
+
+</Callout>
+
+## Staff Auth Reference
+
+Call protected Edge Functions with the Supabase access token from the active staff session. Edge Functions use that JWT to identify the caller before applying role and tenant checks.
 
 ```bash
-curl https://api.example.com/v1/example \
-  -H "Authorization: Bearer YOUR_TOKEN"
+curl -X POST https://tobniuipsothugcuqhdb.supabase.co/functions/v1/create-access-code \
+  -H "Authorization: Bearer <supabase-access-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"video_id": "uuid", "guest_email": "guest@example.com", "expires_at": "2026-01-01T23:59:59Z"}'
 ```
 
-<ParamField header="Authorization" param-type="string" required="true">
-  `Bearer YOUR_TOKEN`
-</ParamField>
+## Guest Auth Reference
 
-## Keep OpenAPI in sync
+Guest access uses a public verification step followed by token issuance and authenticated event logging. The browser never creates the JWT locally and never decides which guest identity to trust.
 
-Define your authentication and base settings in `openapi.yaml` so the API Reference stays accurate and consistent.
+```bash
+# Step 1: Verify access code
+curl -X POST https://tobniuipsothugcuqhdb.supabase.co/functions/v1/verify-access-code \
+  -H "Content-Type: application/json" \
+  -d '{"code": "ABC123"}'
 
-At a minimum, you should:
+# Step 2: Generate guest token
+curl -X POST https://tobniuipsothugcuqhdb.supabase.co/functions/v1/generate-guest-token \
+  -H "Content-Type: application/json" \
+  -d '{"access_code_id": "uuid"}'
 
-- Define one or more security schemes that describe how clients authenticate (for example, bearer token, API key in a header, or other scheme).
-- Reference those security schemes on operations that require authentication so they are clearly marked as secured.
-- Set the correct base URL and any required global headers (for example, versioning or tenant headers) so example requests are copy-pasteable.
+# Step 3: Log viewing event
+curl -X POST https://tobniuipsothugcuqhdb.supabase.co/functions/v1/log-guest-viewing-event \
+  -H "Authorization: Bearer <guest-jwt>" \
+  -H "Content-Type: application/json" \
+  -d '{"video_id": "uuid", "event_type": "start", "device": "Mozilla/5.0..."}'
+```
 
-When your real authentication flow changes (for example, new header names, token formats, or additional requirements), update `openapi.yaml`. The generated API Reference will then reflect your current auth model without needing to edit each endpoint page by hand.
+## Security boundaries
 
-## Using the API reference
+Authentication in ScreenThis is split by actor and execution context. Staff JWTs secure authenticated browser and Edge Function flows, while guest JWTs are isolated to controlled video access and event logging.
 
-Use the API Reference to explore endpoints, required parameters, and example responses. When you change authentication headers or base URLs, update `openapi.yaml` so the generated reference matches what your clients should use.
+<Callout kind="alert">
 
-## Common mistakes
+RLS is enabled on all public tables. Browser PostgREST calls operate with the authenticated JWT and are tenant-scoped by policies. Service-role access appears only in Edge Functions and bypasses RLS — every such path performs explicit identity, role, tenant, or webhook verification first. Guest JWTs use a separate secret from staff JWTs and are manually verified.
 
-<Expandable title="Why am I getting a 401?" default-open="false">
+</Callout>
 
-Verify that:
+## Next steps
 
-- The token is valid and not expired.
-- The token is sent in the `Authorization` header.
-- The header value includes the `Bearer` prefix and a space before the token.
+<Columns cols={2}>
+  <Card title="Edge Functions API" href="/api-reference/edge-functions" icon="code" horizontal="false">
 
-</Expandable>
+  Full reference for all Edge Function endpoints.
+
+  </Card>
+  <Card title="Getting Started" href="/quickstart" icon="zap" horizontal="false">
+
+  Set up your account and send your first invitation.
+
+  </Card>
+</Columns>

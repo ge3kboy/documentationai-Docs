@@ -1,0 +1,140 @@
+---
+title: Administration
+description: Manage managers and guests, configure company and communication settings, and control data retention.
+---
+
+## Administration tasks
+
+Administrators manage people, company settings, communication, and data retention. This guide covers account management, manager and guest administration, company configuration, email settings, and retention policies.
+
+## Account management
+
+Use the profile menu in the top-right corner to manage your own account. These actions affect only your sign-in session and password.
+
+<Steps>
+  <Step title="Change password" icon="key" title-type="p">
+    Select your profile image or initials, choose **Change Password**, enter a password with at least eight characters, confirm it, and select **Update Password**.
+  </Step>
+
+  <Step title="Log out" icon="log-out" title-type="p">
+    Open the profile menu and select **Log out**. Finish or cancel any active upload first.
+  </Step>
+</Steps>
+
+## Manage managers
+
+Manage managers from **Settings**. Use this area to invite staff, resend setup emails, adjust optional access, and remove accounts when someone should no longer sign in.
+
+### Invite a manager
+
+<Steps>
+  <Step title="Find Invite Manager" icon="user-plus" title-type="p">
+    Open **Settings** and find the manager section.
+  </Step>
+
+  <Step title="Enter details" icon="mail" title-type="p">
+    Enter the manager's email address and assign a company.
+  </Step>
+
+  <Step title="Send invite" icon="send" title-type="p">
+    Select **Invite**. The manager receives an account setup email.
+  </Step>
+</Steps>
+
+### Resend an invitation
+
+Find the manager and use the resend action when the original setup email expired or was not received. Use this before creating a second invitation for the same person.
+
+### Grant permissions
+
+Adjust optional access from the manager's settings or permissions controls. Grant only the access the manager needs for their role.
+
+<Callout kind="info" collapsed="false">
+  Administrators can control Analytics access and Advance Invites access for each manager. Advance Invites must also be enabled for the manager's company.
+</Callout>
+
+### Remove a manager
+
+Use the manager's action menu and confirm removal when the account should no longer be used. Removing a manager blocks future sign-in for that account.
+
+<Callout kind="alert" collapsed="false">
+  Removing a manager prevents future sign-in but does not remove historical records of actions already taken.
+</Callout>
+
+## Manage guests
+
+Open **Settings** and choose the guest section. **Guest Emails** lists addresses previously invited by the company.
+
+<Callout kind="alert" collapsed="false">
+  Removing a guest can also remove that guest's active access codes for the company. Read the confirmation before continuing.
+</Callout>
+
+## Company settings
+
+Open **Settings** and select a company. Company controls may include general details, feature permissions, video upload settings and allowed formats, video allocation and usage, email settings and templates, and manager permissions.
+
+<Callout kind="alert" collapsed="false">
+  Changes to company settings can affect every manager and invitation in that company. Review the selected company before saving.
+</Callout>
+
+## Communication settings
+
+Use communication settings to control how invitation and test emails are sent, formatted, tracked, and reviewed. Most changes in this area affect company-wide email behavior.
+
+### Email delivery
+
+Review delivery callback information and copy the displayed URLs when configuring the organization's email system. These settings are normally managed by a system administrator.
+
+### Email templates
+
+<Steps>
+  <Step title="Choose template" icon="file-text" title-type="p">
+    Select **Global defaults** or **Company override**, then choose the template type.
+  </Step>
+
+  <Step title="Edit message" icon="edit" title-type="p">
+    Edit the message using placeholders for guest-specific values.
+  </Step>
+
+  <Step title="Preview and save" icon="check" title-type="p">
+    Preview the result and select **Save**. Use **Restore defaults** to discard custom wording.
+  </Step>
+</Steps>
+
+### Email verification
+
+Administrators can test an address and manage how Advance Invites verification works. Change these settings only when you understand the impact on batch review and sending.
+
+## Data retention
+
+Open **Settings** and select **Data Retention**. Retention actions can affect old invitations, viewing logs, audit logs, and email events.
+
+<Steps>
+  <Step title="Choose record type" icon="file-text" title-type="p">
+    Select the record type and age for the retention action.
+  </Step>
+
+  <Step title="Dry run" icon="eye" title-type="p">
+    Select **Dry run** and review the number of records that would be affected.
+  </Step>
+
+  <Step title="Run action" icon="trash-2" title-type="p">
+    Complete a dry run first, then select the run, archive, or delete action and confirm the warning.
+  </Step>
+</Steps>
+
+<Callout kind="alert" collapsed="false">
+  Use retention tools only under your organization's approved data policy. Always complete a dry run first to verify the scope.
+</Callout>
+
+## Next steps
+
+<Columns cols="2">
+  <Card title="Advance Invites" href="/guides/advance-invites" icon="layers" horizontal="false">
+    Send batch invitations with verification and templates.
+  </Card>
+
+  <Card title="Analytics & Audit" href="/guides/analytics-and-audit" icon="bar-chart" horizontal="false">
+    Track viewing activity and export compliance data.
+  </Card>
+</Columns>

@@ -1,0 +1,641 @@
+---
+title: Edge Functions API
+description: Reference for Supabase Edge Functions — guest access, invitations, uploads, webhooks, email, staff management, and exports.
+---
+
+## Base URL
+
+Edge Functions are the primary backend API for ScreenThis. They handle security-sensitive operations including guest access, invitation delivery, video uploads, webhook processing, email sending, staff management, and data retention. All functions are mounted at the base URL below.
+
+```bash
+https://tobniuipsothugcuqhdb.supabase.co/functions/v1/<function-name>
+```
+
+<Callout kind="info">
+
+Authentication classes: Public (no auth), Staff JWT (Supabase session), Guest JWT (short-lived token), Signed webhook (HMAC), Shared secret (header), Scheduler/internal (platform-protected).
+
+</Callout>
+
+## Guest Access
+
+These endpoints power the guest video access flow: validate a code, issue a short-lived guest token, and record playback activity.
+
+### POST `/verify-access-code`
+
+Verify a guest access code and return the minimum video and access context needed to continue the guest flow.
+
+**Auth:** Public  
+**Rate limit:** 10 failed attempts per 15 minutes per IP
+
+<ParamField body="code" param-type="string" required="true" show-location="false">
+Guest access code entered by the recipient.
+</ParamField>
+
+```bash
+curl -X POST https://tobniuipsothugcuqhdb.supabase.co/functions/v1/verify-access-code \
+  -H "Content-Type: application/json" \
+  -d '{"code":"ABC123"}'
+```
+
+Returns an array of matching rows with fields including `video_id`, `title`, `description`, `poster_url`, `duration`, `gumlet_asset_id`, `views_remaining`, `expires_at`, and `access_code_id`.
+
+<Callout kind="info">
+
+Returns `400` with `error_code` values `NOT_YET_AVAILABLE` or `EXPIRED` when the code is outside its valid access window. Returns `404` for an unknown code and `429` when the rate limit is exceeded.
+
+</Callout>
+
+### POST `/generate-guest-token`
+
+Generate a short-lived guest JWT after the server validates the access code, expiry window, and remaining views.
+
+**Auth:** Public
+
+<ParamField body="access_code_id" param-type="string" required="true" show-location="false">
+Unique ID of the validated access code.
+</ParamField>
+
+```bash
+curl -X POST https://tobniuipsothugcuqhdb.supabase.co/functions/v1/generate-guest-token \
+  -H "Content-Type: application/json" \
+  -d '{"access_code_id":"8e2f9d8b-2b8d-4f85-a6d7-6c6d6a4f4c21"}'
+```
+
+The function atomically increments `views_used` and enforces a 10-second issuance cooldown for the same code.
+
+### POST `/log-guest-viewing-event`
+
+Log guest playback events after the client has a guest JWT.
+
+**Auth:** Guest JWT
+
+<ParamField body="video_id" param-type="string" required="true" show-location="false">
+Video ID associated with the active guest session.
+</ParamField>
+
+<ParamField body="event_type" param-type="string" required="true" enum="access,start" show-location="false">
+Guest event to record.
+</ParamField>
+
+<ParamField body="device" param-type="string" required="true" show-location="false">
+User agent or device description captured by the client.
+</ParamField>
+
+```bash
+curl -X POST https://tobniuipsothugcuqhdb.supabase.co/functions/v1/log-guest-viewing-event \
+  -H "Authorization: Bearer guest_jwt_example_9xmk7q2r" \
+  -H "Content-Type: application/json" \
+  -d '{"video_id":"0d7a8b9e-9e2e-4a6d-b3c1-7bbf7a2274b1","event_type":"start","device":"Mozilla/5.0"}'
+```
+
+A successful response returns `success: true` and the updated `views_remaining` count.
+
+## Invitations
+
+Invitation endpoints create, resend, and revoke guest access codes. These endpoints require a Supabase access token from the active staff session.
+
+### POST `/create-access-code`
+
+Create an access code, persist the invitation, and send the guest email.
+
+**Auth:** Staff JWT
+
+<ParamField body="video_id" param-type="string" required="true" show-location="false">
+Target video UUID.
+</ParamField>
+
+<ParamField body="guest_email" param-type="string" required="true" show-location="false">
+Guest email address. The server normalizes the address before sending.
+</ParamField>
+
+<ParamField body="expires_at" param-type="string" required="true" show-location="false">
+ISO 8601 timestamp when the access code expires.
+</ParamField>
+
+<ParamField body="views_allowed" param-type="integer" required="false" show-location="false">
+Optional limit on how many times the guest can generate a viewing session.
+</ParamField>
+
+<ParamField body="starts_at" param-type="string" required="false" show-location="false">
+Optional ISO 8601 timestamp before which the code is not yet valid.
+</ParamField>
+
+<ParamField body="display_timezone" param-type="string" required="false" show-location="false">
+Timezone label used when presenting the invitation window to recipients.
+</ParamField>
+
+<ParamField body="video_title" param-type="string" required="false" show-location="false">
+Template context value for the email body. The authoritative video record is still loaded server-side.
+</ParamField>
+
+<ParamField body="base_url" param-type="string" required="false" show-location="false">
+App origin used to build links in the email.
+</ParamField>
+
+<ParamField body="email_template" param-type="string" required="false" show-location="false">
+Optional rendered invitation template body.
+</ParamField>
+
+<ParamField body="job_item_id" param-type="string" required="false" show-location="false">
+Bulk job item identifier used for idempotent batch sends.
+</ParamField>
+
+```bash
+curl -X POST https://tobniuipsothugcuqhdb.supabase.co/functions/v1/create-access-code \
+  -H "Authorization: Bearer supabase_access_token_example_9xmk7q2r" \
+  -H "Content-Type: application/json" \
+  -d '{"video_id":"0d7a8b9e-9e2e-4a6d-b3c1-7bbf7a2274b1","guest_email":"jane.chen@acme.com","expires_at":"2026-01-01T23:59:59Z","views_allowed":3,"starts_at":"2025-12-15T08:00:00Z","display_timezone":"America/Los_Angeles","video_title":"Q4 Product Walkthrough","base_url":"https://app.screenthis.com"}'
+```
+
+A successful response returns `success`, the created `accessCode`, and an `email` object with provider delivery metadata.
+
+### POST `/resend-invitation`
+
+Resend the invitation email for an existing access code.
+
+**Auth:** Staff JWT
+
+<ParamField body="code_id" param-type="string" required="true" show-location="false">
+Access code ID to resend.
+</ParamField>
+
+<ParamField body="base_url" param-type="string" required="true" show-location="false">
+App origin used when rebuilding the invitation link.
+</ParamField>
+
+```bash
+curl -X POST https://tobniuipsothugcuqhdb.supabase.co/functions/v1/resend-invitation \
+  -H "Authorization: Bearer supabase_access_token_example_9xmk7q2r" \
+  -H "Content-Type: application/json" \
+  -d '{"code_id":"4d7e4899-7cfd-4f35-9e53-f0a9830aa7f1","base_url":"https://app.screenthis.com"}'
+```
+
+The response includes `success`, a human-readable `message`, and an `email` status object.
+
+### POST `/revoke-access-code`
+
+Disable an active guest access code.
+
+**Auth:** Staff JWT
+
+<ParamField body="code_id" param-type="string" required="true" show-location="false">
+Access code ID to revoke.
+</ParamField>
+
+```bash
+curl -X POST https://tobniuipsothugcuqhdb.supabase.co/functions/v1/revoke-access-code \
+  -H "Authorization: Bearer supabase_access_token_example_9xmk7q2r" \
+  -H "Content-Type: application/json" \
+  -d '{"code_id":"4d7e4899-7cfd-4f35-9e53-f0a9830aa7f1"}'
+```
+
+A successful response returns `success: true`.
+
+## Video Upload & Lifecycle
+
+Upload endpoints register videos, initialize direct uploads, and manage the archived or deleted state of video records and provider assets.
+
+### POST `/upload-pabbly`
+
+Register a video and trigger the automation workflow for URL-based ingest.
+
+**Auth:** Staff JWT
+
+<ParamField body="company_id" param-type="string" required="false" show-location="false">
+Company UUID. Managers use their profile company; admins may provide an allowed company ID.
+</ParamField>
+
+<ParamField body="title" param-type="string" required="true" show-location="false">
+Video title stored on the ScreenThis record.
+</ParamField>
+
+<ParamField body="video_url" param-type="string" required="true" show-location="false">
+Source URL for the video asset.
+</ParamField>
+
+<ParamField body="poster_url" param-type="string" required="false" show-location="false">
+Optional poster image URL.
+</ParamField>
+
+<ParamField body="duration_seconds" param-type="integer" required="true" show-location="false">
+Video duration in seconds.
+</ParamField>
+
+```bash
+curl -X POST https://tobniuipsothugcuqhdb.supabase.co/functions/v1/upload-pabbly \
+  -H "Authorization: Bearer supabase_access_token_example_9xmk7q2r" \
+  -H "Content-Type: application/json" \
+  -d '{"company_id":"1d6ed2d2-a0bb-4a93-8da9-8b5a0d2dca31","title":"Q4 Product Walkthrough","video_url":"https://cdn.acme-media.com/uploads/q4-walkthrough.mp4","poster_url":"https://cdn.acme-media.com/posters/q4-walkthrough.jpg","duration_seconds":742}'
+```
+
+The function creates a pending video record and returns `success` with the new `video_id`.
+
+### POST `/gumlet-direct-upload-init`
+
+Initialize a direct browser upload and create the video record in `uploading` status.
+
+**Auth:** Staff JWT
+
+<ParamField body="company_id" param-type="string" required="false" show-location="false">
+Optional company UUID when an admin uploads on behalf of a tenant.
+</ParamField>
+
+<ParamField body="title" param-type="string" required="true" show-location="false">
+Video title.
+</ParamField>
+
+<ParamField body="filename" param-type="string" required="true" show-location="false">
+Original file name from the client upload.
+</ParamField>
+
+<ParamField body="file_size" param-type="integer" required="true" show-location="false">
+Upload size in bytes.
+</ParamField>
+
+<ParamField body="content_type" param-type="string" required="true" show-location="false">
+MIME type of the uploaded video file.
+</ParamField>
+
+<ParamField body="duration_seconds" param-type="integer" required="true" show-location="false">
+Video duration in seconds.
+</ParamField>
+
+<ParamField body="replacement_of_video_id" param-type="string" required="false" show-location="false">
+Existing video to replace after upload completes.
+</ParamField>
+
+```bash
+curl -X POST https://tobniuipsothugcuqhdb.supabase.co/functions/v1/gumlet-direct-upload-init \
+  -H "Authorization: Bearer supabase_access_token_example_9xmk7q2r" \
+  -H "Content-Type: application/json" \
+  -d '{"company_id":"1d6ed2d2-a0bb-4a93-8da9-8b5a0d2dca31","title":"Q4 Product Walkthrough","filename":"q4-walkthrough.mp4","file_size":284993214,"content_type":"video/mp4","duration_seconds":742}'
+```
+
+The response includes `video_id`, `asset_id`, `upload_url`, and `status`.
+
+### POST `/gumlet-direct-upload-complete`
+
+Complete a single-part or multipart direct upload and move the video into processing.
+
+**Auth:** Staff JWT
+
+<ParamField body="video_id" param-type="string" required="true" show-location="false">
+Video record being finalized.
+</ParamField>
+
+<ParamField body="asset_id" param-type="string" required="true" show-location="false">
+Provider asset identifier created during upload initialization.
+</ParamField>
+
+<ParamField body="upload_mode" param-type="string" required="true" enum="single,multipart" show-location="false">
+Upload completion mode.
+</ParamField>
+
+<ParamField body="parts" param-type="array" required="false" show-location="false">
+Multipart upload parts. Required when `upload_mode` is `multipart`.
+</ParamField>
+
+<ParamField body="replacement_of_video_id" param-type="string" required="false" show-location="false">
+Existing video to replace after the new upload finishes processing.
+</ParamField>
+
+```bash
+curl -X POST https://tobniuipsothugcuqhdb.supabase.co/functions/v1/gumlet-direct-upload-complete \
+  -H "Authorization: Bearer supabase_access_token_example_9xmk7q2r" \
+  -H "Content-Type: application/json" \
+  -d '{"video_id":"0d7a8b9e-9e2e-4a6d-b3c1-7bbf7a2274b1","asset_id":"ast_7vK2mLp9Qe","upload_mode":"multipart","parts":[{"PartNumber":1,"ETag":"\"b9f9b7036d7a3f5f1b4d0b9d8c3c5e11\""}]}'
+```
+
+The response returns `success`, `status`, and optionally `replacement_summary` when the upload replaces an existing video.
+
+### POST `/soft-delete-video`
+
+Archive a video without permanently deleting provider assets or associated records.
+
+**Auth:** Staff JWT
+
+<ParamField body="video_id" param-type="string" required="true" show-location="false">
+Video UUID to archive.
+</ParamField>
+
+```bash
+curl -X POST https://tobniuipsothugcuqhdb.supabase.co/functions/v1/soft-delete-video \
+  -H "Authorization: Bearer supabase_access_token_example_9xmk7q2r" \
+  -H "Content-Type: application/json" \
+  -d '{"video_id":"0d7a8b9e-9e2e-4a6d-b3c1-7bbf7a2274b1"}'
+```
+
+A successful response returns `success` and a confirmation `message`.
+
+### POST `/restore-video`
+
+Restore an archived video to active status.
+
+**Auth:** Staff JWT
+
+<ParamField body="video_id" param-type="string" required="true" show-location="false">
+Archived video UUID to restore.
+</ParamField>
+
+```bash
+curl -X POST https://tobniuipsothugcuqhdb.supabase.co/functions/v1/restore-video \
+  -H "Authorization: Bearer supabase_access_token_example_9xmk7q2r" \
+  -H "Content-Type: application/json" \
+  -d '{"video_id":"0d7a8b9e-9e2e-4a6d-b3c1-7bbf7a2274b1"}'
+```
+
+A successful response returns `success` and a confirmation `message`.
+
+### POST `/delete-video`
+
+Permanently delete a video, its provider asset, related storage artifacts, and associated records.
+
+**Auth:** Staff JWT
+
+<ParamField body="video_id" param-type="string" required="true" show-location="false">
+Video UUID to delete permanently.
+</ParamField>
+
+```bash
+curl -X POST https://tobniuipsothugcuqhdb.supabase.co/functions/v1/delete-video \
+  -H "Authorization: Bearer supabase_access_token_example_9xmk7q2r" \
+  -H "Content-Type: application/json" \
+  -d '{"video_id":"0d7a8b9e-9e2e-4a6d-b3c1-7bbf7a2274b1"}'
+```
+
+The response includes `success` and `deleted_at` with the deletion timestamp.
+
+## Webhooks
+
+Webhook endpoints are invoked by external systems or internal automation. Signature validation and shared-secret checks are part of the contract for these functions.
+
+### POST `/gumlet-webhook`
+
+Receive Gumlet asset status updates and apply them to matching videos.
+
+**Auth:** Signed webhook via `x-gumlet-signature`
+
+```bash
+curl -X POST https://tobniuipsothugcuqhdb.supabase.co/functions/v1/gumlet-webhook \
+  -H "x-gumlet-signature: hmac_sha256_example_9xmk7q2r" \
+  -H "Content-Type: application/json" \
+  -d '{"data":{"asset_id":"ast_7vK2mLp9Qe","status":"ready"}}'
+```
+
+The signature must match the HMAC-SHA256 digest of the raw request body using the configured webhook secret.
+
+### POST `/pabbly-update-video-status`
+
+Update video status from the automation layer.
+
+**Auth:** Shared secret via `x-pabbly-secret`
+
+<ParamField body="video_id" param-type="string" required="false" show-location="false">
+Target video UUID. Required when `set_gumlet_asset_id` is present.
+</ParamField>
+
+<ParamField body="gumlet_asset_id" param-type="string" required="false" show-location="false">
+Provider asset ID used when the workflow identifies a video by asset instead of UUID.
+</ParamField>
+
+<ParamField body="status" param-type="string" required="false" show-location="false">
+New video status such as `pending`, `processing`, `ready`, or `failed`.
+</ParamField>
+
+<ParamField body="duration" param-type="integer" required="false" show-location="false">
+Duration to persist on the video record.
+</ParamField>
+
+<ParamField body="set_gumlet_asset_id" param-type="string" required="false" show-location="false">
+Provider asset ID to attach to the video record.
+</ParamField>
+
+```bash
+curl -X POST https://tobniuipsothugcuqhdb.supabase.co/functions/v1/pabbly-update-video-status \
+  -H "x-pabbly-secret: pabbly_secret_example_9xmk7q2r" \
+  -H "Content-Type: application/json" \
+  -d '{"video_id":"0d7a8b9e-9e2e-4a6d-b3c1-7bbf7a2274b1","status":"ready","duration":742}'
+```
+
+Provide at least one identifier, either `video_id` or `gumlet_asset_id`, and at least one update field.
+
+## Email
+
+These endpoints send test messages, normalize provider delivery state, and receive provider webhook events.
+
+### POST `/send-test-email`
+
+Send a test email using the configured provider and company context.
+
+**Auth:** Staff JWT
+
+<ParamField body="to_email" param-type="string" required="true" show-location="false">
+Destination address for the test email.
+</ParamField>
+
+<ParamField body="company_id" param-type="string" required="false" show-location="false">
+Optional company UUID used to resolve tenant configuration.
+</ParamField>
+
+<ParamField body="video_id" param-type="string" required="false" show-location="false">
+Optional video UUID when testing invitation-style emails.
+</ParamField>
+
+```bash
+curl -X POST https://tobniuipsothugcuqhdb.supabase.co/functions/v1/send-test-email \
+  -H "Authorization: Bearer supabase_access_token_example_9xmk7q2r" \
+  -H "Content-Type: application/json" \
+  -d '{"to_email":"ops@acme.com","company_id":"1d6ed2d2-a0bb-4a93-8da9-8b5a0d2dca31","subject":"ScreenThis email test"}'
+```
+
+The response returns `success`, `provider`, `provider_email_id`, `status`, and `company_id`.
+
+### POST `/get-email-status`
+
+Look up provider delivery status and persist the normalized result.
+
+**Auth:** Staff JWT
+
+<ParamField body="provider" param-type="string" required="true" enum="resend,emailit" show-location="false">
+Email provider to query.
+</ParamField>
+
+<ParamField body="provider_email_id" param-type="string" required="true" show-location="false">
+Provider-specific message ID.
+</ParamField>
+
+<ParamField body="to_email" param-type="string" required="true" show-location="false">
+Recipient email address associated with the message.
+</ParamField>
+
+<ParamField body="company_id" param-type="string" required="false" show-location="false">
+Optional company UUID for tenant-scoped lookups.
+</ParamField>
+
+<ParamField body="access_code_id" param-type="string" required="false" show-location="false">
+Optional access code associated with the email event.
+</ParamField>
+
+<ParamField body="job_item_id" param-type="string" required="false" show-location="false">
+Optional bulk invite job item associated with the email event.
+</ParamField>
+
+<ParamField body="subject" param-type="string" required="false" show-location="false">
+Email subject used for logging and display.
+</ParamField>
+
+```bash
+curl -X POST https://tobniuipsothugcuqhdb.supabase.co/functions/v1/get-email-status \
+  -H "Authorization: Bearer supabase_access_token_example_9xmk7q2r" \
+  -H "Content-Type: application/json" \
+  -d '{"provider":"resend","provider_email_id":"re_7c2ab91dfc6f4f71","to_email":"jane.chen@acme.com","subject":"Your private video invitation"}'
+```
+
+The response returns `success`, normalized `status`, and raw `provider_status`.
+
+### POST `/resend-webhook`
+
+Receive Resend delivery events and normalize them into ScreenThis email event records.
+
+**Auth:** Signed webhook via `svix-id`, `svix-timestamp`, and `svix-signature`
+
+```bash
+curl -X POST https://tobniuipsothugcuqhdb.supabase.co/functions/v1/resend-webhook \
+  -H "svix-id: msg_2R8J8yT4vL7qH9x" \
+  -H "svix-timestamp: 1736035200" \
+  -H "svix-signature: v1,hmac_example_9xmk7q2r" \
+  -H "Content-Type: application/json" \
+  -d '{"type":"email.delivered","data":{"email_id":"re_7c2ab91dfc6f4f71","to":["jane.chen@acme.com"]}}'
+```
+
+The function accepts supported delivery events, records normalized status changes, and returns `ok: true`.
+
+## Staff Management
+
+Staff management endpoints provision or remove internal users through Supabase Auth and ScreenThis tenant rules.
+
+### POST `/invite-manager`
+
+Invite a manager to a company.
+
+**Auth:** Staff JWT
+
+<ParamField body="email" param-type="string" required="true" show-location="false">
+Manager email address to invite.
+</ParamField>
+
+<ParamField body="company_id" param-type="string" required="false" show-location="false">
+Target company UUID when the requestor has permission to choose a company.
+</ParamField>
+
+```bash
+curl -X POST https://tobniuipsothugcuqhdb.supabase.co/functions/v1/invite-manager \
+  -H "Authorization: Bearer supabase_access_token_example_9xmk7q2r" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"manager@acme.com","company_id":"1d6ed2d2-a0bb-4a93-8da9-8b5a0d2dca31"}'
+```
+
+The function returns the Supabase admin invite response object.
+
+### POST `/delete-user`
+
+Delete an Auth user.
+
+**Auth:** Staff JWT, admin only
+
+<ParamField body="userId" param-type="string" required="true" show-location="false">
+Supabase Auth user ID to delete.
+</ParamField>
+
+```bash
+curl -X POST https://tobniuipsothugcuqhdb.supabase.co/functions/v1/delete-user \
+  -H "Authorization: Bearer supabase_access_token_example_9xmk7q2r" \
+  -H "Content-Type: application/json" \
+  -d '{"userId":"7e4f3b0e-7b1e-42d4-8d46-1f8d6dcd6a81"}'
+```
+
+A successful response returns a confirmation `message`.
+
+## Exports & Retention
+
+Export and retention endpoints generate CSV output, archive old rows, or run scheduled administrative reporting.
+
+### POST `/export-viewing-logs-csv`
+
+Export tenant-visible viewing logs as a CSV attachment.
+
+**Auth:** Staff JWT, admin scope
+
+<ParamField body="company_id" param-type="string" required="false" show-location="false">
+Optional company UUID. Non-super-admin requests resolve to the caller's permitted company scope.
+</ParamField>
+
+```bash
+curl -X POST https://tobniuipsothugcuqhdb.supabase.co/functions/v1/export-viewing-logs-csv \
+  -H "Authorization: Bearer supabase_access_token_example_9xmk7q2r" \
+  -H "Content-Type: application/json" \
+  -d '{"company_id":"1d6ed2d2-a0bb-4a93-8da9-8b5a0d2dca31"}'
+```
+
+Successful responses return CSV content with the `text/csv` content type.
+
+### POST `/archive-access-codes`
+
+Archive old access code rows into the archive store.
+
+**Auth:** Staff JWT, admin scope
+
+<ParamField body="days_old" param-type="integer" required="true" show-location="false">
+Archive rows older than this many days. The value must be positive.
+</ParamField>
+
+<ParamField body="dry_run" param-type="boolean" required="true" show-location="false">
+Set to `true` to return counts without moving data.
+</ParamField>
+
+<ParamField body="company_id" param-type="string" required="false" show-location="false">
+Optional company UUID for scoped archive operations.
+</ParamField>
+
+```bash
+curl -X POST https://tobniuipsothugcuqhdb.supabase.co/functions/v1/archive-access-codes \
+  -H "Authorization: Bearer supabase_access_token_example_9xmk7q2r" \
+  -H "Content-Type: application/json" \
+  -d '{"days_old":42,"dry_run":true,"company_id":"1d6ed2d2-a0bb-4a93-8da9-8b5a0d2dca31"}'
+```
+
+Dry runs return `count` without modifying data. Execution mode returns `archived_count`.
+
+### POST `/send-archived-videos-weekly-report`
+
+Send the scheduled archived-videos report to the configured recipient.
+
+**Auth:** Scheduler/internal
+
+```bash
+curl -X POST https://tobniuipsothugcuqhdb.supabase.co/functions/v1/send-archived-videos-weekly-report
+```
+
+<Callout kind="alert">
+
+This function has no request-level authentication. Protect it at the scheduler or platform invocation boundary.
+
+</Callout>
+
+The response returns `success`, `already_sent`, `video_count`, and `recipient`.
+
+## PostgREST & RPC
+
+The browser also directly accesses RLS-protected tables via Supabase PostgREST and calls client-facing RPC functions such as `get_access_codes_with_details`, `get_analytics_summary_for_user`, `get_database_health_metrics`, and `admin_update_profile`. These are not Edge Function HTTP endpoints. Call them through the Supabase JavaScript client query builder rather than `/functions/v1`.
+
+## Next steps
+
+<Columns cols={2}>
+  <Card title="Authentication" href="/authentication" icon="lock" horizontal="false">
+  Learn about the staff and guest auth models.
+  </Card>
+  <Card title="Architecture Overview" href="/internal/architecture" icon="server" horizontal="false">
+  Understand how Edge Functions fit into the system.
+  </Card>
+</Columns>

@@ -1,54 +1,80 @@
 ---
-title: Core Concepts
-description: The basic building blocks of this starter kit.
+title: User Journeys
+description: How managers and guests move through ScreenThis — from upload to playback.
 ---
 
-## Overview
+## Uploader Journey
 
-<Callout kind="alert">
-This page is an example. Replace every concept with the real terms your product uses.
-</Callout>
+ScreenThis supports two primary user journeys — uploading and sharing video content, and viewing content as a guest. Each journey connects through the access code system.
 
-## The building blocks
-
-<Columns cols={2}>
-  <Card title="Pages" icon="file-text">
-    Every page is an `.mdx` file. Content lives in the repo and is safe to edit.
-  </Card>
-  <Card title="Navigation" icon="list">
-    Sidebar structure comes from `documentation.json`.
-  </Card>
-  <Card title="Components" icon="layout-grid">
-    Reusable blocks like Callouts, Steps, Tabs, and Cards keep pages consistent.
-  </Card>
-  <Card title="API Reference" icon="code">
-    If you use it, the API tab reads from `openapi.yaml`.
-  </Card>
-</Columns>
-
-## Navigation shape (sample)
-
-```json
-{
-  "tab": "Documentation",
-  "groups": [
-    {
-      "group": "Getting Started",
-      "pages": [
-        { "title": "Introduction", "path": "introduction" }
-      ]
-    }
-  ]
-}
-```
-
-## How to adapt this page
+Managers use the uploader flow to register videos, wait for processing, and send controlled invitations to guests. The workflow starts in the Content Library and ends when a viewer receives an invitation with access rules such as expiry and allowed views.
 
 <Steps>
-  <Step title="Replace the terms" icon="edit">
-    Swap "Pages" and "Components" for your real domain language.
+  <Step title="Sign in" icon="log-in" title-type="p">
+
+    Authenticate via Supabase Auth with your email and password.
+
   </Step>
-  <Step title="Add your concepts" icon="plus">
-    Create a section for the ideas your users must learn first.
+  <Step title="Upload a video" icon="upload" title-type="p">
+
+    Navigate to Content Library and register a video. Processing is handled by Gumlet via automation.
+
+  </Step>
+  <Step title="Wait for processing" icon="clock" title-type="p">
+
+    Video status transitions from pending to processing to ready. You will be notified when it is ready.
+
+  </Step>
+  <Step title="Invite a viewer" icon="mail" title-type="p">
+
+    Select a ready video, enter the guest email, set expiry and view limits, and send the invitation.
+
+  </Step>
+  <Step title="Manage invitations" icon="settings" title-type="p">
+
+    Review, resend, or revoke invitations from the Home dashboard.
+
   </Step>
 </Steps>
+
+## Viewer (Guest) Journey
+
+Guests move through a short, gated access flow designed to protect content without requiring a full account. Access depends on the invitation link, a six-character code, accepted terms, and a valid guest session issued by the server.
+
+<Steps>
+  <Step title="Receive invitation" icon="mail" title-type="p">
+
+    Guest receives an email with a direct link and a six-character access code.
+
+  </Step>
+  <Step title="Enter access code" icon="key" title-type="p">
+
+    Open the link or Guest Access page and enter the code.
+
+  </Step>
+  <Step title="Accept terms" icon="file-check" title-type="p">
+
+    Review and accept the terms and conditions to unlock playback.
+
+  </Step>
+  <Step title="Watch the video" icon="play-circle" title-type="p">
+
+    The server verifies the code, issues a guest token, and opens the protected player with a watermark.
+
+  </Step>
+</Steps>
+
+## How flows connect
+
+The two journeys connect through the access code. Managers create codes and send invitations. Guests use codes to access videos. Each code carries expiry, view limits, and company-level isolation enforced by Row-Level Security.
+
+## Learn more
+
+<Columns cols={2}>
+  <Card title="Home & Invitations" href="/guides/home-and-invitations" icon="layout-dashboard" horizontal="false">
+    Detailed guide on the dashboard and invitation management.
+  </Card>
+  <Card title="Guest Experience" href="/guides/guest-experience" icon="play-circle" horizontal="false">
+    The complete guest viewing flow.
+  </Card>
+</Columns>

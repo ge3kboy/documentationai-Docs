@@ -1,0 +1,97 @@
+---
+title: Backlog & Known Issues
+description: Planned features, completed work, and known limitations for ScreenThis.
+---
+
+## Planned features
+
+This backlog tracks work that is planned but not yet started.
+
+- **First-class upload UX** — Direct file upload with resumable uploads instead of URL-based ingest.
+- **Stronger guest access policies**
+  - Per-code IP allow and deny lists
+  - Optional password protection
+  - Privacy-aware device fingerprinting
+- **Granular analytics dashboards**
+  - Per-company rollups
+  - Per-video rollups
+  - Anomaly alerts for suspicious access patterns
+- **Billing and quotas**
+  - Per-company storage quotas
+  - Per-company streaming quotas
+  - Role-based limits such as invite rate and maximum views
+- **Audit exports automation**
+  - Scheduled exports to storage
+  - Retention policies
+
+## In progress
+
+This section records work that has started but is not yet complete.
+
+<Callout kind="info">
+
+No work is currently recorded as in progress in this repository. Add items here when implementation begins.
+
+</Callout>
+
+## Done and implemented
+
+These items are already shipped or present in the current repository state.
+
+- **Multi-tenant company isolation** — Implemented through migrations and UI filtering.
+- **Guest access codes with expiry and view limits**
+- **Server-side view limit enforcement** — Enforced through guest token issuance.
+- **Rate limiting for repeated invalid guest code attempts**
+- **Email invites and resend invites** — Implemented with Resend.
+- **Video status updates** — Handled through the Gumlet webhook and Pabbly status webhook.
+- **Analytics and audit log pages**
+- **Export and archive edge functions**
+
+## Known issues
+
+These issues are known gaps or implementation risks that should factor into planning and maintenance work.
+
+<Callout kind="alert">
+
+**Hardcoded Pabbly webhook URL**
+
+- **Risk** — Environment coupling and difficult rotation.
+- **Improvement** — Move the URL to a Supabase secret or a per-company setting.
+
+</Callout>
+
+<Callout kind="alert">
+
+**Edge Function logging consistency**
+
+- **Risk** — Some functions do not consistently prefix logs with the function name, which makes debugging harder.
+- **Improvement** — Standardize log formatting so logs stay grep-friendly.
+
+</Callout>
+
+<Callout kind="alert">
+
+**Guest email handling and privacy**
+
+- **Risk** — Viewer email is used for watermarking, which may require a clearer compliance position.
+- **Improvement** — Confirm whether masking is required in the UI, token, or both.
+
+</Callout>
+
+<Callout kind="alert">
+
+**Auth super admin override**
+
+- **Risk** — A hardcoded email override exists for super-admin access.
+- **Improvement** — Manage super-admin access through database roles.
+
+</Callout>
+
+<Callout kind="alert">
+
+**Missing public docs for RLS policies**
+
+- **Risk** — RLS behavior is encoded in migrations, which makes audit review slower when policy questions come up.
+- **Improvement** — Add a concise RLS policy map if audits become frequent.
+
+</Callout>

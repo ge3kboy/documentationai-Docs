@@ -1,0 +1,389 @@
+---
+title: Architecture Overview
+description: System purpose, runtime topology, frontend composition, identity model, core data flows, and security boundaries.
+---
+
+## Architecture overview
+
+ScreenThis is a multi-tenant video distribution and controlled-viewing application. Authenticated staff upload or register videos, issue time- and view-limited invitations, and review analytics. Guests exchange an access code for a short-lived viewing token and view a specific video without creating an account.
+
+## Runtime topology
+
+The frontend is a Vite React SPA deployed as static assets with an SPA rewrite for client-side routing. Supabase hosts identity, data access, RPCs, and Deno Edge Functions. Sensitive credentials remain in Edge Function secrets rather than the browser.
+
+- **Browser** — React Router, AuthProvider, CompanyFilterProvider, AdvanceInvitationsProgressProvider, React Query cache, pages, and feature components
+- **Supabase** — Auth, PostgREST and RPC, Edge Functions, PostgreSQL with RLS
+- **External systems** — video processing and playback, email providers, email verifier, and webhook automation
+
+## Repository architecture
+
+The repository separates route-level UI, shared frontend data logic, Supabase-backed backend execution, and operational configuration. That separation makes it easier to reason about where identity is enforced, where side effects run, and where tenant boundaries are checked.
+
+### Frontend
+
+- **`src/main.tsx`** — mounts `App` and the global toast provider under React Strict Mode
+- **`src/App.tsx`** — owns the route table and top-level providers
+- **`src/pages/`** — route-level screens
+- **`src/components/`** — feature-organized UI, including `advanced`, `analytics`, `archive`, `auth`, `home`, `integrations`, `layout`, `settings`, `video`, and `ui`
+- **`src/hooks/`** — data access and mutations
+- **`src/integrations/supabase/`** — browser client and auth context
+- **`src/lib/` and `src/utils/`** — formatting, upload persistence, sanitization, templates, and error translation
+- **`src/types/`** — frontend domain contracts
+
+### Backend
+
+- **`supabase/functions/name/index.ts`** — one HTTP Edge Function entry point per directory
+- **`supabase/functions/_shared/`** — shared email, tenant-scope, upload, and quota logic
+- **`supabase/migrations/`** — database evolution history
+
+### Static and operational
+
+- **`public/`** — static assets
+- **`vite.config.ts`** — configures the `@` alias and dev server port `8080`
+- **`vercel.json`** — rewrites routes to `index.html` for SPA routing
+- **`scripts/check-edge-functions.mjs`** — parses Edge Function TypeScript as a verification step
+
+## Frontend composition
+
+`App` creates one React Query client with a five-minute `staleTime`, a ten-minute `gcTime`, and no refetch on window focus. Most application state lives in server-backed queries, while providers carry only cross-cutting identity and UI context.
+
+### Provider order
+
+1. QueryClientProvider
+2. AuthProvider
+3. CompanyFilterProvider
+4. AdvanceInvitationsProgressProvider
+5. Global head injection
+6. Error boundary
+7. Router and routes
+
+### Routes
+
+| Route | Audience | Purpose |
+|---|---|---|
+| `/login` | Public staff | Staff authentication |
+| `/guest/:code` | Public guest | Guest access-code entry and playback flow |
+| `/guest` | Public guest | Guest access fallback entry |
+| `/` | Authenticated staff | Primary authenticated entry |
+| `/home` | Authenticated staff | Home dashboard |
+| `/content-library` | Authenticated staff | Video and invitation management |
+| `/content-library/video/:videoId/codes` | Authenticated staff | Access-code management for one video |
+| `/advanced-invitations` | Permission-gated staff | Bulk invitation workflow |
+| `/analytics` | Permission-gated staff | Analytics and reporting |
+| `/audit-log` | Admin | Administrative audit history |
+| `/archived` | Admin and manager | Archived video and record views |
+| `/settings` | Authenticated staff | Settings area with role-gated sections |
+| `*` | Any | Not found route |
+
+<Callout kind="info">
+
+Authorization is not trusted solely to route visibility. Database RLS and Edge Function checks enforce access again at the data layer.
+
+</Callout>
+
+## Identity and authorization
+
+ScreenThis has two trust domains: staff sessions backed by Supabase Auth and guest sessions backed by short-lived signed tokens. The code paths, secrets, and validation rules differ on purpose because staff management and guest playback have different risk profiles.
+
+### Staff sessions
+
+Supabase Auth issues the session used by authenticated staff. `AuthProvider` observes auth changes and loads the `profiles` row under RLS, which adds `role`, `company_id`, `can_access_analytics`, and `can_use_advanced_invites`. A super-admin allowlist enables global scope, while regular admins and managers stay constrained to their own company.
+
+### Guest sessions
+
+Guest access runs in a separate trust domain from staff authentication. `verify-access-code` validates an access code without a Supabase session, `generate-guest-token` rechecks schedule and usage state, atomically consumes a view with a ten-second cooldown, and signs an HS256 JWT. `log-guest-viewing-event` manually verifies that JWT and rejects mismatched video or guest context before writing analytics records.
+
+<Callout kind="alert">
+
+The client-supplied email is never trusted for token issuance or logging. The guest JWT contains the server-derived email.
+
+</Callout>
+
+## Core data flows
+
+Most application behavior reduces to a small set of flows that move data across the browser, Supabase, and external providers. Reading these flows end to end makes it easier to debug ownership checks, webhook timing, and state transitions.
+
+### Staff sign-in
+
+Staff authentication starts in the browser but becomes authoritative only after the profile row loads under RLS. That second step attaches tenant and permission context to the raw Supabase session.
+
+<Steps>
+  <Step title="Submit credentials">
+
+  The sign-in form sends staff credentials to Supabase Auth.
+
+  </Step>
+  <Step title="Issue session">
+
+  Supabase Auth returns a session JWT for the authenticated user.
+
+  </Step>
+  <Step title="Load profile under RLS">
+
+  `AuthProvider` loads the corresponding `profiles` row to resolve role, company, and feature permissions.
+
+  </Step>
+  <Step title="Record login audit event">
+
+  The application records the login through `record_user_login()`.
+
+  </Step>
+</Steps>
+
+### Video registration (URL automation)
+
+This flow covers videos registered from an external source URL rather than uploaded directly from the browser. The system creates an internal video row first, then waits for external processing callbacks to complete the lifecycle.
+
+<Steps>
+  <Step title="Send video details to upload-pabbly">
+
+  The UI sends title, source URL, poster URL, company context, and duration to `upload-pabbly`.
+
+  </Step>
+  <Step title="Verify identity and resolve company">
+
+  The function verifies the staff session, loads the profile, and resolves the effective company scope.
+
+  </Step>
+  <Step title="Check configuration and quota">
+
+  The backend validates upload configuration, workspace settings, DRM requirements, and quota availability.
+
+  </Step>
+  <Step title="Create a pending video">
+
+  The function inserts a pending `videos` row before any external processing starts.
+
+  </Step>
+  <Step title="Call the automation webhook">
+
+  The backend invokes the configured automation webhook for URL-based ingest.
+
+  </Step>
+  <Step title="Receive status callback">
+
+  `pabbly-update-video-status` or a signed webhook updates the internal video status later.
+
+  </Step>
+</Steps>
+
+### Direct browser upload
+
+Direct uploads move the file transfer path away from the application server and toward provider-managed upload URLs. ScreenThis still owns authorization, quota checks, and final status transitions.
+
+<Steps>
+  <Step title="Initialize the upload">
+
+  `gumlet-direct-upload-init` validates the session, tenant scope, enabled formats, feature flag, workspace, DRM profile, and quota, then creates an `uploading` video.
+
+  </Step>
+  <Step title="Upload file data">
+
+  The browser uploads the file directly in single-part mode or requests per-part URLs for multipart uploads.
+
+  </Step>
+  <Step title="Complete the upload">
+
+  `gumlet-direct-upload-complete` finalizes the upload, records duration metadata, and moves the video into processing.
+
+  </Step>
+  <Step title="Transition to final status">
+
+  A signed webhook updates the video to its final provider-reported state.
+
+  </Step>
+</Steps>
+
+### Invitation creation
+
+Invitation creation combines tenant authorization, schedule validation, rate limiting, guest tracking, and outbound email delivery. Most downstream analytics and guest playback depend on this flow completing correctly.
+
+<Steps>
+  <Step title="Call create-access-code">
+
+  The client submits invitation details to `create-access-code`.
+
+  </Step>
+  <Step title="Authenticate and check ownership">
+
+  The function verifies the staff session and confirms that the caller can act on the target video.
+
+  </Step>
+  <Step title="Validate schedule and address">
+
+  The backend validates expiry, optional start time, and guest email rules.
+
+  </Step>
+  <Step title="Apply rate limits">
+
+  Company email limits and related abuse checks run before any invitation is created.
+
+  </Step>
+  <Step title="Create the code record">
+
+  The function generates a random code and inserts the `access_codes` row.
+
+  </Step>
+  <Step title="Record the guest">
+
+  A trigger ensures the guest appears in `invited_guests`.
+
+  </Step>
+  <Step title="Send the invitation email">
+
+  The selected provider sends the invitation message.
+
+  </Step>
+  <Step title="Store email event metadata">
+
+  `email_events` stores the provider identifier and delivery-related metadata.
+
+  </Step>
+  <Step title="Write the audit record">
+
+  The system records the action in the audit log.
+
+  </Step>
+</Steps>
+
+### Advanced batch
+
+The advanced invitation workflow adds a job layer on top of normal invitation creation. That layer tracks verification state, per-item status, and idempotent send behavior for larger batches.
+
+<Steps>
+  <Step title="Create batch job records">
+
+  The client creates `bulk_invite_jobs` and `bulk_invite_job_items`.
+
+  </Step>
+  <Step title="Start verification">
+
+  `bulk-verify-emails` starts or resumes provider-side verification work.
+
+  </Step>
+  <Step title="Update item states and counts">
+
+  Verification results update job-item states, classifications, and aggregate counts.
+
+  </Step>
+  <Step title="Send the completion notification">
+
+  `send-verification-complete-email` optionally notifies the job owner when verification completes.
+
+  </Step>
+  <Step title="Invoke create-access-code per item">
+
+  The send queue calls `create-access-code` for each sendable item, using `job_item_id` to keep the operation idempotent.
+
+  </Step>
+</Steps>
+
+### Guest playback and analytics
+
+Guest playback starts with a public code exchange but quickly becomes a signed-token flow. Analytics records then combine guest events, RPC summaries, and tenant-scoped reads.
+
+<Steps>
+  <Step title="Verify the guest code and issue the token">
+
+  The guest code is validated and a view is consumed when the short-lived token is issued.
+
+  </Step>
+  <Step title="Write viewing events">
+
+  Access and start events create `guest_viewing_logs`, and `playback_events` may store more detailed playback data.
+
+  </Step>
+  <Step title="Read analytics data">
+
+  Analytics hooks combine RPC-based summaries with RLS-protected log reads.
+
+  </Step>
+  <Step title="Export reporting data">
+
+  CSV export Edge Functions generate downloadable reporting output when needed.
+
+  </Step>
+</Steps>
+
+### Archiving and deletion
+
+Deletion is intentionally split into archive, restore, and permanent removal paths. That split supports retention workflows, operational recovery, and external asset cleanup.
+
+<Steps>
+  <Step title="Archive the video">
+
+  Soft delete marks the video as archived instead of removing it immediately.
+
+  </Step>
+  <Step title="Restore when needed">
+
+  Restore clears archive markers and returns the video to active use.
+
+  </Step>
+  <Step title="Permanently delete records and assets">
+
+  Permanent delete removes the provider asset, database records, and poster assets.
+
+  </Step>
+  <Step title="Run retention jobs">
+
+  Retention endpoints copy old rows to archive tables or delete old email events.
+
+  </Step>
+  <Step title="Clean up poster lifecycle state">
+
+  Poster lifecycle triggers manage orphaned image records after related changes.
+
+  </Step>
+</Steps>
+
+## State model
+
+The application uses server state rather than a global client store for most data. React Query manages fetch lifecycles and cache freshness, while providers carry only the cross-page state that cannot be derived from a single query.
+
+- **React Query** — fetched entities, loading and error state, cache freshness, and mutation invalidation
+- **AuthProvider** — session, user, and profile
+- **CompanyFilterProvider** — selected company filter for admins
+- **AdvanceInvitationsProgressProvider** — cross-page batch progress
+- **Local component state** — forms, dialogs, tabs, selection, and upload progress
+- **PostgreSQL** — authoritative source for permissions, counters, status, and relationships
+
+## Security boundaries
+
+Security enforcement happens at multiple layers because route guards alone are insufficient in a multi-tenant system. Browser reads remain tenant-scoped through RLS, while privileged server paths must re-establish identity and authorization before using elevated access.
+
+<Callout kind="alert">
+
+RLS is enabled on all public tables. Browser PostgREST calls operate with the authenticated JWT and are tenant-scoped by policies. Service-role access appears only in Edge Functions and bypasses RLS — every such path performs explicit identity, role, tenant, or webhook verification first. External webhook endpoints authenticate with HMAC or signature headers or shared secrets. Guest JWTs use a separate secret and are manually verified. Remote poster fetching validates protocol and port, rejects non-images, and caps responses at 10 MiB.
+
+</Callout>
+
+## External integration boundaries
+
+ScreenThis depends on a small number of external systems, each with a narrow responsibility boundary. Those boundaries matter when tracing failures because each provider owns a different part of the lifecycle.
+
+- **Video provider** — asset creation, direct and multipart upload, duration lookup, transcoding status, playback, and deletion
+- **Email providers** — company-selectable delivery, status lookup, and signed event webhooks
+- **Email verifier** — single and bulk address verification
+- **Automation webhook** — URL-based video ingest and status callback
+- **Vercel** — static SPA hosting and history fallback
+
+## Next steps
+
+<Columns cols={3}>
+  <Card title="Tech Stack" href="/internal/tech-stack" icon="code" horizontal="false">
+  
+  The full technology stack.
+  
+  </Card>
+  <Card title="Database & State" href="/internal/database" icon="database" horizontal="false">
+  
+  Table schemas, RLS, and state management.
+  
+  </Card>
+  <Card title="Setup & Deployment" href="/internal/setup-and-deployment" icon="rocket" horizontal="false">
+  
+  Local development and deployment.
+  
+  </Card>
+</Columns>

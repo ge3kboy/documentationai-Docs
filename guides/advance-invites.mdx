@@ -1,0 +1,157 @@
+---
+title: Advance Invites
+description: Batch-send invitations with custom email templates, recipient verification, and a review-before-send workflow.
+---
+
+## Before creating a batch
+
+Advance Invites is a guided batch-invitation workflow. It verifies recipient addresses, separates safe and questionable entries, sends within company limits, and keeps progress available if you leave the page.
+
+<Callout kind="info">
+
+Confirm that Advance Invites is enabled for your company, your account has permission, the video is ready, and your recipient list fits the company's maximum batch size.
+
+</Callout>
+
+The Advance Invites page has two tabs. Use **Create** to build, verify, review, and send a batch. Use **Batches** to search and manage earlier batches.
+
+## Batch, video and viewing window
+
+Start by defining the batch details that every recipient will share. These settings control which video is sent, how many views each guest receives, and when access begins or ends.
+
+<Steps>
+  <Step title="Set batch name" icon="edit" title-type="p">
+
+  Review or edit the batch name. The suggested format is `YY-MM-DD.video title`.
+
+  </Step>
+  <Step title="Select video" icon="video" title-type="p">
+
+  Choose a ready video and enter views allowed for each recipient.
+
+  </Step>
+  <Step title="Set viewing window" icon="clock" title-type="p">
+
+  Choose an optional start time and the required expiration time. Confirm the timezone because it controls how times appear in the email and guest countdown.
+
+  </Step>
+</Steps>
+
+## Email template
+
+Build the message before you add recipients so you can review the content in its final form. ScreenThis loads the company default message first, and you can edit it for the batch.
+
+<Steps>
+  <Step title="Review default message" icon="file-text" title-type="p">
+
+  Review the default message loaded for the company.
+
+  </Step>
+  <Step title="Edit the message" icon="edit" title-type="p">
+
+  Edit the email body. Keep placeholders in double braces so each invitation receives the correct details.
+
+  </Step>
+  <Step title="Preview and confirm" icon="check" title-type="p">
+
+  Review the preview and select **Use this** when the content is ready.
+
+  </Step>
+</Steps>
+
+<Callout kind="warning">
+
+Do not replace placeholders with one recipient's real code or link. ScreenThis fills them separately for every recipient. Common placeholders include company name, video title, guest link, access code, views allowed, start and expiration dates, timezone, and poster image.
+
+</Callout>
+
+ScreenThis supports up to three saved template versions, which helps when you need a few approved message variants for different campaigns or audiences.
+
+## Recipients
+
+Add and clean your recipient list before creating the batch. ScreenThis deduplicates entries and shows whether the list stays within the company limit.
+
+<Steps>
+  <Step title="Paste addresses" icon="clipboard" title-type="p">
+
+  Paste addresses into the recipient field. Addresses can be separated by lines, commas, or spaces.
+
+  </Step>
+  <Step title="Review counts" icon="bar-chart" title-type="p">
+
+  Review counts for raw entries, unique recipients, and invalid addresses. Correct every invalid address.
+
+  </Step>
+  <Step title="Create batch" icon="package" title-type="p">
+
+  Confirm the deduplicated total does not exceed **Max per batch**, then select **Create batch**.
+
+  </Step>
+</Steps>
+
+<Callout kind="info">
+
+Creating the batch locks the selected video, access rules, and template so recipients remain consistent.
+
+</Callout>
+
+## Verify recipients
+
+After the batch is created, ScreenThis verifies eligible new addresses. Recipient groups are **Existing** for addresses already known to the company, **Safe new** for new verified addresses, and **Needs review** for uncertain, bounced, invalid, or flagged addresses.
+
+<Callout kind="warning">
+
+Do not create a duplicate batch while verification runs. Use the verification refresh action to request the latest state, or use **Resume** to reopen the batch.
+
+</Callout>
+
+Verification progress may appear in a popover. If you leave the page, return to the batch from **Batches** and continue from the saved state instead of starting over.
+
+## Review and send
+
+Use the final review step to resolve questionable recipients before any email is sent. This is where you decide which addresses are safe to keep and which need correction or removal.
+
+<Steps>
+  <Step title="Review flagged recipients" icon="alert-triangle" title-type="p">
+
+  Open Step 4 and review **Needs review** recipients. For each flagged address, correct it and retry, retry verification, or remove it from the batch.
+
+  </Step>
+  <Step title="Confirm safe counts" icon="check-check" title-type="p">
+
+  Confirm the safe recipient counts and review the latest send details.
+
+  </Step>
+  <Step title="Send" icon="send" title-type="p">
+
+  Select **Start / Resume** or **Resume / Start sending** to begin sending invitations.
+
+  </Step>
+</Steps>
+
+<Callout kind="alert">
+
+Do not resend to a high-risk or previously bounced address unless the address has been corrected and confirmed.
+
+</Callout>
+
+## Sending limits
+
+The progress area may show the provider limit per batch, the company batch size limit, and remaining sends in the current window. ScreenThis sends within these limits automatically.
+
+If sending pauses, reopen the batch and use the available resume action. ScreenThis keeps batch progress so you can continue without rebuilding the list.
+
+## Next steps
+
+<Columns cols={2}>
+  <Card title="Home & Invitations" href="/guides/home-and-invitations" icon="layout-dashboard" horizontal="false">
+
+  Manage individual invitations from the dashboard.
+
+  </Card>
+  <Card title="Content Library" href="/guides/content-library" icon="folder" horizontal="false">
+
+  Manage videos in your workspace.
+
+  </Card>
+</Columns>

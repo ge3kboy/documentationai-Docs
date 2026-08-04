@@ -1,78 +1,71 @@
 ---
-title: Set Up Your Documentation
-description: 'A minimal, editable starting point for your own documentation site.'
+title: Introduction
+description: >-
+  Secure video hosting with controlled sharing — access codes, view limits,
+  start/end expiry, DRM, dynamic watermarking, and multi-tenant isolation for
+  managers and guests.
 ---
-## Start here (5–10 minutes)
+## ScreenThis at a glance
 
-1. Edit this page so it describes your product and audience.
+ScreenThis is a secure video hosting and controlled-sharing platform for teams that need to deliver video to specific viewers under strict access controls. Upload videos, generate guest access codes, enforce expiry and view limits, apply dynamic watermarking and DRM protections, and track viewing activity across companies with tenant-level isolation.
 
-2. Customize your onboarding flow in the [Quickstart](/quickstart) page.
+## Who uses ScreenThis?
 
-3. Delete or rewrite any sections and pages you do not plan to use.
-
-4. Invite a teammate to review the structure and concepts starting from [Core Concepts](/concepts).
-
-<Callout kind="alert" collapsed="false">
-  This site ships with placeholder content. Edit the text, links, and examples so they match your product before sharing it with others.
-</Callout>
-
-## What you get
-
-<Columns cols="3">
-  <Card title="Docs structure" href="/quickstart" icon="book-open" horizontal="false">
-    A clear navigation layout with starter pages you can rename or replace.
+<Columns cols="2">
+  <Card title="Managers" href="/quickstart" icon="upload" horizontal="false">
+    Upload videos, generate access codes, invite guests, and track viewing activity.
   </Card>
 
-  <Card title="Components" href="#try-a-few-components" icon="layout-grid" horizontal="false" target="_self">
-    Prebuilt blocks like Callouts, Steps, Tabs, and Cards to keep pages clean.
-  </Card>
-
-  <Card title="API reference hook" href="/authentication" icon="code" horizontal="false">
-    A placeholder `openapi.yaml` you can swap with your real API spec.
+  <Card title="Guests" href="/guides/home-and-invitations" icon="play-circle" horizontal="false">
+    Receive invitations, enter access codes, and watch videos securely within viewing windows.
   </Card>
 </Columns>
 
-## Make your first edit
+## Why ScreenThis?
 
-<Steps>
-  <Step title="Rewrite this page" icon="edit" title-type="p">
-    Update the title, description, and sections in `introduction` so they reflect your product and documentation goals.
-  </Step>
+ScreenThis helps you share sensitive or time-limited video without handing out unrestricted links. Each invitation can be tied to a specific guest with its own access code, expiry date, view limit, watermarking, and company-scoped access rules, so you can control who watches, how often they watch, and how activity is recorded.
 
-  <Step title="Customize Quickstart" icon="zap" title-type="p">
-    Replace the steps in `quickstart` with your real onboarding flow so new readers know exactly how to get started.
-  </Step>
+## Key differentiators
 
-  <Step title="Remove or repurpose samples" icon="trash" title-type="p">
-    Delete unused sample sections and pages, or rewrite them with your own content to keep navigation focused.
-  </Step>
-</Steps>
-
-## Try a few components
-
-You can browse the component gallery in the [Components](/components) page for ready-to-use examples of Cards, Callouts, Steps, Tabs, and more.
-
-## Continue to the rest of the sample
-
-<Columns cols="2">
-  <Card title="Quickstart" href="/quickstart" icon="zap" horizontal="false">
-    See the minimal setup flow.
+<Columns cols="3">
+  <Card title="Access Codes" href="/quickstart" icon="key" horizontal="false">
+    Per-video unique 6-character codes for controlled guest access.
   </Card>
 
-  <Card title="Core Concepts" href="/concepts" icon="layers" horizontal="false">
-    Learn how pages, navigation, and components fit together.
+  <Card title="View Limits" href="/concepts" icon="eye" horizontal="false">
+    Cap the number of views per invitation, enforced server-side.
   </Card>
 
-  <Card title="Components" href="/components" icon="code" horizontal="false">
-    A small gallery of built-in components.
+  <Card title="Expiry" href="/guides/home-and-invitations" icon="clock" horizontal="false">
+    Automatic expiration of access codes based on configurable dates.
   </Card>
 
-  <Card title="Authentication" href="/authentication" icon="lock" horizontal="false">
-    Example layout for an auth guide.
+  <Card title="DRM Protection" href="/authentication" icon="lock" horizontal="false">
+    Prevents downloads and screen recording across supported browsers.
   </Card>
 
-  <Card title="Help Center" href="/help-center" icon="help-circle" horizontal="false">
-    Starter FAQ, guides, and troubleshooting templates.
+  <Card title="Dynamic Watermarking" href="/guides/home-and-invitations" icon="droplet" horizontal="false" target="_self">
+    Identifies viewers by embedding guest email in the video stream.
+  </Card>
+
+  <Card title="Multi-Tenant Isolation" href="/concepts" icon="building" horizontal="false">
+    Company-level data separation with hardened Row-Level Security.
+  </Card>
+</Columns>
+
+## Next steps
+
+<Columns cols="3">
+  <Card title="Getting Started" href="/quickstart" icon="zap" horizontal="false">
+    Set up your account and send your first invitation.
+  </Card>
+
+  <Card title="User Journeys" href="/concepts" icon="layers" horizontal="false">
+    Understand how managers and guests navigate ScreenThis.
+  </Card>
+
+  <Card title="Home & Invitations" href="/guides/home-and-invitations" icon="layout-dashboard" horizontal="false">
+    Explore the dashboard and manage invitations.
   </Card>
 </Columns>
 

@@ -1,0 +1,347 @@
+---
+title: Setup & Deployment
+description: Prerequisites, local development, secrets, provider configuration, Edge Function deployment, release verification, and observability for ScreenThis.
+---
+
+## Prerequisites
+
+Set up ScreenThis against the hosted Supabase project and a production-like frontend environment. Local development does not use a local Supabase stack, so you need access to the connected services before you start.
+
+- **Node.js 20.x** — the repository targets the Node version declared in `package.json`.
+- **npm compatible with Node 20** — used for local development, builds, linting, tests, and preview.
+- **Supabase project access** — required for database changes, Auth settings, Edge Function logs, and secrets.
+- **Frontend hosting access** — required for production deployments and SPA routing validation.
+- **Provider credentials** — required for video, email, verification, and automation integrations.
+
+<Callout kind="info">
+
+The repository is a Vite React SPA. The browser client points at a hosted Supabase project, and the `@` import alias resolves to `src/`.
+
+</Callout>
+
+## Install and run locally
+
+Install dependencies and start the Vite development server.
+
+```bash
+npm install
+npm run dev
+```
+
+The dev server binds to all interfaces on port `8080`. Use `http://localhost:8080` in your browser.
+
+A successful local startup shows the Vite dev server running without dependency or port errors. If startup fails before the app renders, fix the local Node or npm mismatch first.
+
+### Available scripts
+
+Use these scripts during development and release preparation.
+
+```bash
+npm run build
+npm run build:dev
+npm run lint
+npm run test
+npm run check:functions
+npm run preview
+```
+
+- **`npm run build`** — creates the production frontend build.
+- **`npm run build:dev`** — creates a development-mode build.
+- **`npm run lint`** — runs lint checks.
+- **`npm run test`** — runs the test suite.
+- **`npm run check:functions`** — runs the Edge Function integrity check.
+- **`npm run preview`** — serves the built app locally for verification.
+
+## Frontend configuration
+
+The frontend Supabase client is configured in `src/integrations/supabase/client.ts`. The current setup uses a hosted project URL and publishable key directly in source, so no `.env` file is required for the browser app.
+
+<Callout kind="alert">
+
+Never place `SUPABASE_SERVICE_ROLE_KEY`, webhook secrets, provider API keys, or `JWT_SECRET` in Vite environment variables or frontend source. The publishable key is expected to be visible in browser-delivered code. Secret values are not.
+
+</Callout>
+
+If you later move public configuration into Vite variables, expose only `VITE_*` values that are safe for the browser. Restrict those variables to public values such as the hosted Supabase URL and publishable key.
+
+## Edge Function secrets
+
+Manage Edge Function secrets in Supabase under **Project → Edge Functions → Manage Secrets**. Keep all secret values out of the repository and out of deployment logs.
+
+<Callout kind="alert">
+
+Never commit secret values. Never return service-role credentials, provider secrets, or guest token signing secrets in browser responses, frontend bundles, or client-visible logs.
+
+</Callout>
+
+| Secret | Purpose |
+|---|---|
+| `SUPABASE_URL` | Supabase project URL available to Edge Functions |
+| `SUPABASE_ANON_KEY` | Supabase publishable key used where anon access is required |
+| `SUPABASE_SERVICE_ROLE_KEY` | Elevated backend key for privileged operations inside trusted server code |
+| `SUPABASE_DB_URL` | Database connection URL for functions or tooling that require direct DB access |
+| `JWT_SECRET` | Signs and verifies guest JWTs |
+| `GUMLET_API_KEY` | Authenticates Gumlet API requests |
+| `GUMLET_WEBHOOK_SECRET` | Verifies Gumlet webhook signatures or shared-secret callbacks |
+| `GUMLET_SIGNING_KEY` | Additional signing key used in Gumlet-related verification flows |
+| `PABBLY_STATUS_WEBHOOK_SECRET` | Shared secret expected on the Pabbly status webhook |
+| `PABBLY_SINGLE_VERIFY_WEBHOOK_URL` | Target URL used by single verification automation |
+| `RESEND_API_KEY` | Primary API key for Resend transactional email |
+| `RESEND_STATUS_API_KEY` | API key used for Resend status-related operations |
+| `RESEND_WEBHOOK_SECRET` | Verifies callbacks sent to the Resend webhook endpoint |
+| `RESEND_FROM` | Default sender identity for Resend-delivered email |
+| `EMAILIT_API_KEY` | API key for Emailit delivery |
+| `EMAILIT_WEBHOOK_SECRET` | Verifies Emailit webhook callbacks |
+| `EMAILIT_FROM` | Default sender identity for Emailit-delivered email |
+| `REOON_BULK_API` | API credential for bulk verification workflows |
+| `RECON_API` | API credential for recon or validation workflows |
+| `PUBLIC_WEB_URL` | Base public application URL used in generated links and callbacks |
+
+<Callout kind="info">
+
+Supabase also provides some project-linked values automatically, but you still need to confirm they exist in the target project before a release. Secret drift between environments is a common cause of post-deploy failures.
+
+</Callout>
+
+## Database setup and evolution
+
+The connected Supabase project contains the live schema. Repository SQL under `supabase/migrations/` records schema changes and should remain aligned with the deployed database state.
+
+Apply database changes through the Supabase deployment pipeline rather than editing production tables manually. Manual changes make future migrations harder to reason about and increase the risk of destructive drift.
+
+### Operational rules
+
+- **Apply schema changes through the deployment pipeline** so migration history remains authoritative.
+- **Enable RLS on every table** that can be reached from browser-facing flows.
+- **Treat grants and RLS as separate controls** because grants alone do not enforce tenant isolation.
+- **Grant browser roles only the minimum operations they need**.
+- **Keep `service_role` out of browser code** and all client-facing execution paths.
+- **Review `SECURITY DEFINER` functions carefully** and set a safe `search_path` with explicit authorization checks.
+- **Reconcile migrations with the live schema before destructive changes** such as column drops, table rewrites, or policy removals.
+
+<Callout kind="alert">
+
+Do not assume RLS is sufficient because a table exists behind Supabase Auth. Validate policies, browser-visible roles, RPC access, and any `SECURITY DEFINER` behavior together before release.
+
+</Callout>
+
+## Authentication setup
+
+ScreenThis uses Supabase email and password authentication for staff users. The `handle_new_user` trigger creates a corresponding `profiles` row when a new user is created.
+
+Manager invitations set `company_id` in user metadata. Confirm that invitation flows preserve the intended company assignment, especially when testing manager and admin onboarding paths.
+
+### Authentication checks
+
+- Configure both production and local web origins in Supabase Auth redirect settings.
+- Confirm invited staff receive the expected company metadata.
+- Validate `profiles` RLS and any role or permission flags used by the frontend.
+- Test manager, admin, and super-admin login separately to confirm scope isolation.
+
+Guests do not use Supabase Auth. Guest access depends on functions that sign and verify tokens with `JWT_SECRET`, so that secret must exist and match across every guest token issuance and verification path.
+
+## Provider configuration
+
+Provider configuration spans company-scoped video settings, email delivery, webhook callbacks, and scheduled maintenance jobs. Missing or inconsistent provider settings usually fail as runtime errors rather than build errors, so verify them before every release.
+
+### Company-scoped video settings
+
+Direct upload behavior depends on values stored in `companies` and `company_settings`. Required settings include the upload workspace or collection, DRM profile, upload mode or formats, and any optional quota rules.
+
+If a required upload setting is missing, direct upload should fail closed rather than fall back to an unsafe default. Validate this behavior for every company profile that can upload content.
+
+### Email delivery
+
+Global defaults and company settings determine which email provider is active, which sender identity is used, and which templates, tracking rules, or rate limits apply.
+
+Webhook callbacks use these endpoints:
+
+- **Resend** — `/functions/v1/resend-webhook`
+- **Emailit** — `/functions/v1/emailit-webhook`
+
+### Video status and automation callbacks
+
+Video processing and automation depend on external callbacks reaching the correct project URL with the expected secret.
+
+- **Gumlet webhook** — `/functions/v1/gumlet-webhook`
+- **Pabbly automation** — `/functions/v1/pabbly-update-video-status` with the `x-pabbly-secret` header
+
+### Scheduled maintenance
+
+The `send-archived-videos-weekly-report` function handles scheduled POST requests and deduplicates runs in `archived_video_report_runs`. Confirm the scheduler points at the correct environment and that repeat executions do not create duplicate reports.
+
+## Frontend production build and hosting
+
+Build the frontend with Vite and publish the generated `dist/` directory through the hosting platform.
+
+```bash
+npm run build
+```
+
+A successful production build emits static assets to `dist/`. If the build passes locally but fails in hosting, compare the Node version, install logs, and any environment-specific build configuration first.
+
+### SPA routing rewrite
+
+The hosting layer must serve `index.html` for unknown paths so React Router can handle client-side routes. The repository uses a catch-all rewrite in `vercel.json`.
+
+```json
+{
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
+```
+
+Deployment follows the standard frontend pipeline: source push to the hosting project, dependency install, Vite build, and publish of `dist/`.
+
+## Edge Function deployment
+
+Each directory under `supabase/functions/` that contains an `index.ts` is an independently deployed function. Shared code is imported from `_shared`.
+
+<Callout kind="info">
+
+The current function source assumes CORS preflight handling and manual authentication. Runtime JWT verification may be disabled, so a function must authenticate requests explicitly by calling Supabase Auth, verifying a guest JWT, or verifying a webhook signature or shared secret.
+
+</Callout>
+
+<Steps>
+  <Step title="Run the Edge Function integrity check" icon="terminal">
+
+  Execute the repository check before you deploy any function changes.
+
+  ```bash
+  npm run check:functions
+  ```
+
+  Success means the integrity check completes without reporting broken imports, invalid function structure, or other repository-level issues.
+
+  </Step>
+  <Step title="Confirm required secrets in the target project" icon="lock">
+
+  Open the target Supabase project and verify that every required secret is present and current. Pay special attention to environment-specific values such as callback URLs, email senders, and guest token secrets.
+
+  </Step>
+  <Step title="Verify provider webhooks point at the target URL" icon="settings">
+
+  Confirm Gumlet, Resend, Emailit, Pabbly, and any scheduled callers target the intended environment. A valid deployment can still fail immediately if providers continue posting to a previous project URL.
+
+  </Step>
+  <Step title="Deploy the changed functions through the Supabase pipeline" icon="upload">
+
+  Deploy only after code, secrets, and provider endpoints are aligned. Each function directory is deployed independently, so make sure all changed functions required by a feature ship together.
+
+  </Step>
+  <Step title="Inspect logs after smoke tests" icon="check-circle">
+
+  Run smoke tests against the deployed environment, then inspect Supabase Edge Function logs. Look for authentication failures, missing secrets, webhook verification errors, and provider-specific runtime failures.
+
+  </Step>
+</Steps>
+
+## Release verification checklist
+
+Run release verification after frontend and function deployment, not before. This checklist is intended to catch tenant isolation problems, broken callback flows, and secret exposure that static checks will not detect.
+
+<Steps>
+  <Step title="Confirm the production frontend build completes" icon="check-circle">
+
+  Validate that the production build succeeds locally or in CI without missing dependencies or Vite build errors.
+
+  ```bash
+  npm run build
+  ```
+
+  </Step>
+  <Step title="Run TypeScript, lint, tests, and Edge Function checks" icon="terminal">
+
+  Run the repository validation commands used before release.
+
+  ```bash
+  npm run lint
+  npm run test
+  npm run check:functions
+  ```
+
+  </Step>
+  <Step title="Test login and profile loading for every privileged scope" icon="users">
+
+  Confirm login and profile hydration work for manager, admin, and super-admin users. Verify that role-specific UI and data loading behavior match the expected scope.
+
+  </Step>
+  <Step title="Verify tenant isolation in the company filter" icon="shield">
+
+  Confirm a non-super-admin cannot use the company filter or any direct request path to access another tenant's data.
+
+  </Step>
+  <Step title="Test the full upload lifecycle" icon="upload">
+
+  Verify upload initialization, upload completion, provider webhook delivery, and the final ready state for video processing.
+
+  </Step>
+  <Step title="Test invitation flows" icon="mail">
+
+  Verify both single and bulk invitation flows send successfully and record the expected delivery or event data.
+
+  </Step>
+  <Step title="Validate guest access enforcement" icon="lock">
+
+  Confirm guest access enforces start time, expiry, view count, and token verification rules across issuance and playback.
+
+  </Step>
+  <Step title="Verify analytics and exports stay within company scope" icon="bar-chart">
+
+  Confirm analytics pages, exports, and any reporting endpoints return only data permitted for the active company and role.
+
+  </Step>
+  <Step title="Exercise delete and restore lifecycle behavior" icon="trash">
+
+  Verify soft delete, restore, permanent delete, and poster lifecycle behavior for affected content.
+
+  </Step>
+  <Step title="Reject invalid signed webhooks" icon="shield">
+
+  Confirm email and video webhook handlers reject invalid signatures or incorrect shared secrets.
+
+  </Step>
+  <Step title="Check for secret exposure in browser-delivered surfaces" icon="alert-triangle">
+
+  Inspect browser bundles, network responses, and client-visible logs to confirm that service-role or provider secrets are never exposed.
+
+  </Step>
+</Steps>
+
+## Observability and recovery
+
+Use the failure surface to decide where to investigate first. ScreenThis issues usually fall into one of five categories: browser, backend function, data or authorization, delivery, or video processing.
+
+### Where to look first
+
+- **Browser failures** — inspect the client console and network requests.
+- **Backend failures** — inspect Supabase Edge Function logs.
+- **Data or authorization failures** — inspect PostgREST errors, RPC errors, and the applicable RLS policy.
+- **Delivery failures** — inspect `email_events`, `email_bounces`, and provider delivery logs.
+- **Video processing failures** — inspect `videos.status`, provider asset state, and webhook logs.
+
+### Backup and recovery baseline
+
+Enable Supabase backups and validate that backup and restore assumptions still hold. Recovery planning should focus on the business-critical tables and logs needed to restore tenant access, invitation history, and video availability.
+
+Critical data includes:
+
+- `companies`
+- `profiles`
+- `videos`
+- `access_codes`
+- `guest_viewing_logs`
+- `email_events`
+- `company_settings`
+- audit logs
+
+<Callout kind="info">
+
+Function log lines are generally prefixed with the function name, which helps when tracing multi-step callback flows. Validate backups periodically rather than assuming a configured backup is usable.
+
+</Callout>
