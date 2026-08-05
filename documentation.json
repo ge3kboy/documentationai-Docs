@@ -1,1 +1,162 @@
-{"colors":{"dark":{"brand":"#FDBA74"},"light":{"brand":"#F97316"}},"name":"Starter Kit","navigation":{"tabs":[{"groups":[{"group":"Start Here","icon":"rocket","pages":[{"icon":"home","path":"introduction","title":"Introduction"},{"icon":"zap","path":"quickstart","title":"Quickstart"},{"icon":"code","path":"components","title":"Components"}]},{"group":"Components","icon":"layers","pages":[{"icon":"image","path":"components/images","title":"Images"},{"icon":"square","path":"components/cards","title":"Cards"},{"icon":"code","path":"components/code","title":"Code"},{"icon":"message-square","path":"components/callouts","title":"Callouts"},{"icon":"list-ordered","path":"components/steps","title":"Steps"},{"icon":"columns","path":"components/tabs","title":"Tabs"}]}],"icon":"book","tab":"Documentation"},{"groups":[{"group":"Overview","icon":"file-text","pages":[{"icon":"lock","path":"authentication","title":"Authentication"}]},{"group":"Sample Endpoints","openapi":"openapi.yaml"}],"icon":"code","tab":"API Reference"},{"icon":"help-circle","pages":[{"icon":"home","path":"help-center","title":"Help Center"},{"expandable":false,"group":"FAQs","icon":"help-circle","pages":[{"path":"help-center/faq/getting-started","title":"Documentation Source"}]},{"expandable":false,"group":"Troubleshooting","icon":"alert-triangle","pages":[{"path":"help-center/troubleshooting/install-error","title":"Page Missing in Sidebar"}]},{"expandable":false,"group":"Guides","icon":"book-open","pages":[{"path":"help-center/guides/setup-project","title":"Create Your First Page"}]}],"tab":"Help Center"},{"icon":"clock","pages":[{"icon":"history","path":"changelog","title":"Changelog"},{"title":"Admin Log","path":"admin-log","icon":"clipboard-list"}],"tab":"Changelog"}]}}
+{
+  "colors": {
+    "dark": {
+      "brand": "#FDBA74"
+    },
+    "light": {
+      "brand": "#F97316"
+    }
+  },
+  "name": "Starter Kit",
+  "navigation": {
+    "tabs": [
+      {
+        "groups": [
+          {
+            "group": "Start Here",
+            "icon": "rocket",
+            "pages": [
+              {
+                "icon": "home",
+                "path": "introduction",
+                "title": "Introduction"
+              },
+              {
+                "icon": "zap",
+                "path": "quickstart",
+                "title": "Quickstart"
+              },
+              {
+                "icon": "code",
+                "path": "components",
+                "title": "Components"
+              }
+            ]
+          },
+          {
+            "group": "Components",
+            "icon": "layers",
+            "pages": [
+              {
+                "icon": "image",
+                "path": "components/images",
+                "title": "Images"
+              },
+              {
+                "icon": "square",
+                "path": "components/cards",
+                "title": "Cards"
+              },
+              {
+                "icon": "code",
+                "path": "components/code",
+                "title": "Code"
+              },
+              {
+                "icon": "message-square",
+                "path": "components/callouts",
+                "title": "Callouts"
+              },
+              {
+                "icon": "list-ordered",
+                "path": "components/steps",
+                "title": "Steps"
+              },
+              {
+                "icon": "columns",
+                "path": "components/tabs",
+                "title": "Tabs"
+              }
+            ]
+          }
+        ],
+        "icon": "book",
+        "tab": "Documentation",
+        "public": true
+      },
+      {
+        "groups": [
+          {
+            "group": "Overview",
+            "icon": "file-text",
+            "pages": [
+              {
+                "icon": "lock",
+                "path": "authentication",
+                "title": "Authentication"
+              }
+            ]
+          },
+          {
+            "group": "Sample Endpoints",
+            "openapi": "openapi.yaml"
+          }
+        ],
+        "icon": "code",
+        "tab": "API Reference"
+      },
+      {
+        "icon": "help-circle",
+        "pages": [
+          {
+            "icon": "home",
+            "path": "help-center",
+            "title": "Help Center"
+          },
+          {
+            "expandable": false,
+            "group": "FAQs",
+            "icon": "help-circle",
+            "pages": [
+              {
+                "path": "help-center/faq/getting-started",
+                "title": "Documentation Source"
+              }
+            ]
+          },
+          {
+            "expandable": false,
+            "group": "Troubleshooting",
+            "icon": "alert-triangle",
+            "pages": [
+              {
+                "path": "help-center/troubleshooting/install-error",
+                "title": "Page Missing in Sidebar"
+              }
+            ]
+          },
+          {
+            "expandable": false,
+            "group": "Guides",
+            "icon": "book-open",
+            "pages": [
+              {
+                "path": "help-center/guides/setup-project",
+                "title": "Create Your First Page"
+              }
+            ]
+          }
+        ],
+        "tab": "Help Center",
+        "public": true
+      },
+      {
+        "icon": "clock",
+        "pages": [
+          {
+            "icon": "history",
+            "path": "changelog",
+            "title": "Changelog",
+            "public": true
+          },
+          {
+            "title": "Admin Log",
+            "path": "admin-log",
+            "icon": "clipboard-list"
+          }
+        ],
+        "tab": "Changelog"
+      }
+    ]
+  }
+}
